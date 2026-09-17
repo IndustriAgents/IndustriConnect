@@ -93,8 +93,13 @@ async def _retry_call(
     call_factory: Callable[[], Awaitable[Any]],
     max_retries: int,
     timeout: Optional[float],
+    client: Any = None,
 ) -> Tuple[Optional[Any], Optional[str], float, int]:
-    """Execute call with retries and timeout. Returns (result, error, duration, attempts)."""
+    """Execute call with retries and timeout. Returns (result, error, duration, attempts).
+
+    When `client` is provided, a connection error triggers a reconnect attempt before
+    the next retry — making the server resilient to transient TCP drops.
+    """
     attempt = 0
     start = time.perf_counter()
     last_err: Optional[str] = None
@@ -108,6 +113,20 @@ async def _retry_call(
             ctx.error(f"{op} failed on attempt {attempt}: {last_err}")
             if attempt > max_retries:
                 break
+            backoff = MODBUS_RETRY_BACKOFF_BASE * (2 ** (attempt - 1))
+            await asyncio.sleep(backoff)
+        except (ConnectionError, OSError) as e:
+            # TCP connection dropped — attempt reconnect before retrying
+            last_err = f"{type(e).__name__}: {str(e)}"
+            ctx.error(f"{op} connection error on attempt {attempt}: {last_err}")
+            if attempt > max_retries:
+                break
+            if client is not None:
+                try:
+                    ctx.info(f"{op} attempting reconnect before retry {attempt + 1}")
+                    await client.connect()
+                except Exception as reconnect_err:
+                    ctx.error(f"{op} reconnect failed: {reconnect_err}")
             backoff = MODBUS_RETRY_BACKOFF_BASE * (2 ** (attempt - 1))
             await asyncio.sleep(backoff)
         except Exception as e:  # unexpected
@@ -126,6 +145,7 @@ async def _chunked_read(
     per_request_limit: int,
     attr: str,
     timeout: Optional[float],
+    client: Any = None,
 ) -> Tuple[Optional[List[Any]], Optional[str], Dict[str, Any]]:
     """Generic chunked reader for registers/coils.
 
@@ -147,7 +167,7 @@ async def _chunked_read(
             return await read_func(current, size)
 
         result, err, duration_ms, attempts = await _retry_call(
-            ctx, op, _call, MODBUS_MAX_RETRIES, timeout
+            ctx, op, _call, MODBUS_MAX_RETRIES, timeout, client=client
         )
         if err is not None:
             return None, err, {"partial": values, "chunks": chunks}
@@ -307,7 +327,7 @@ async def read_register(address: int, ctx: Context, slave_id: int = MODBUS_DEFAU
     op = f"read_register addr={address} slave={slave_id}"
     async def _call():
         return await client.read_holding_registers(address=address, count=1, slave=slave_id)
-    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT)
+    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT, client=client)
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "slave_id": slave_id, "duration_ms": round(duration_ms, 3), "attempts": attempts})
     if hasattr(result, "isError") and result.isError():
@@ -335,7 +355,7 @@ async def write_register(address: int, value: int, ctx: Context, slave_id: int =
     op = f"write_register addr={address} value={value} slave={slave_id}"
     async def _call():
         return await client.write_register(address=address, value=value, slave=slave_id)
-    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT)
+    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT, client=client)
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "value": value, "slave_id": slave_id, "duration_ms": round(duration_ms, 3), "attempts": attempts})
     if hasattr(result, "isError") and result.isError():
@@ -367,6 +387,7 @@ async def read_coils(address: int, count: int, ctx: Context, slave_id: int = MOD
         2000,
         "bits",
         MODBUS_TOOL_TIMEOUT,
+        client=client,
     )
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "count": count, "slave_id": slave_id, **meta})
@@ -392,7 +413,7 @@ async def write_coil(address: int, value: bool, ctx: Context, slave_id: int = MO
     op = f"write_coil addr={address} value={value} slave={slave_id}"
     async def _call():
         return await client.write_coil(address=address, value=value, slave=slave_id)
-    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT)
+    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT, client=client)
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "value": value, "slave_id": slave_id, "duration_ms": round(duration_ms, 3), "attempts": attempts})
     if hasattr(result, "isError") and result.isError():
@@ -424,6 +445,7 @@ async def read_input_registers(address: int, count: int, ctx: Context, slave_id:
         125,
         "registers",
         MODBUS_TOOL_TIMEOUT,
+        client=client,
     )
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "count": count, "slave_id": slave_id, **meta})
@@ -454,6 +476,7 @@ async def read_multiple_holding_registers(address: int, count: int, ctx: Context
         125,
         "registers",
         MODBUS_TOOL_TIMEOUT,
+        client=client,
     )
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "count": count, "slave_id": slave_id, **meta})
@@ -498,6 +521,7 @@ async def read_discrete_inputs(address: int, count: int, ctx: Context, slave_id:
         2000,
         "bits",
         MODBUS_TOOL_TIMEOUT,
+        client=client,
     )
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "count": count, "slave_id": slave_id, **meta})
@@ -523,7 +547,7 @@ async def write_registers(address: int, values: List[int], ctx: Context, slave_i
     op = f"write_registers addr={address} n={len(values)} slave={slave_id}"
     async def _call():
         return await client.write_registers(address=address, values=values, slave=slave_id)
-    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT)
+    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT, client=client)
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "count": len(values), "slave_id": slave_id, "duration_ms": round(duration_ms, 3), "attempts": attempts})
     if hasattr(result, "isError") and result.isError():
@@ -545,7 +569,7 @@ async def write_coils_bulk(address: int, values: List[bool], ctx: Context, slave
     op = f"write_coils addr={address} n={len(values)} slave={slave_id}"
     async def _call():
         return await client.write_coils(address=address, values=values, slave=slave_id)
-    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT)
+    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT, client=client)
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "count": len(values), "slave_id": slave_id, "duration_ms": round(duration_ms, 3), "attempts": attempts})
     if hasattr(result, "isError") and result.isError():
@@ -565,7 +589,7 @@ async def mask_write_register(address: int, and_mask: int, or_mask: int, ctx: Co
     op = f"mask_write_register addr={address} and={and_mask} or={or_mask} slave={slave_id}"
     async def _call():
         return await client.mask_write_register(address=address, and_mask=and_mask, or_mask=or_mask, slave=slave_id)
-    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT)
+    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT, client=client)
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "and_mask": and_mask, "or_mask": or_mask, "slave_id": slave_id, "duration_ms": round(duration_ms, 3), "attempts": attempts})
     if hasattr(result, "isError") and result.isError():
@@ -591,7 +615,7 @@ async def read_device_information(ctx: Context, slave_id: int = MODBUS_DEFAULT_S
         else:
             raise AttributeError("Client does not support device information")
 
-    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT)
+    result, err, duration_ms, attempts = await _retry_call(ctx, op, _call, MODBUS_MAX_RETRIES, MODBUS_TOOL_TIMEOUT, client=client)
     if err is not None:
         return _make_result(False, error=err, meta={"slave_id": slave_id, "duration_ms": round(duration_ms, 3), "attempts": attempts})
     if hasattr(result, "isError") and result.isError():
@@ -640,6 +664,7 @@ async def read_holding_typed(
         125,
         "registers",
         MODBUS_TOOL_TIMEOUT,
+        client=client,
     )
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "count": count, "dtype": dtype, "slave_id": slave_id, **meta})
@@ -680,6 +705,7 @@ async def read_input_typed(
         125,
         "registers",
         MODBUS_TOOL_TIMEOUT,
+        client=client,
     )
     if err is not None:
         return _make_result(False, error=err, meta={"address": address, "count": count, "dtype": dtype, "slave_id": slave_id, **meta})
@@ -787,11 +813,39 @@ async def write_tag(
 # -----------------------------
 
 @mcp.tool()
-async def ping(ctx: Context) -> Dict[str, Any]:
-    """Return server health and connection status."""
+async def ping(ctx: Context, slave_id: int = MODBUS_DEFAULT_SLAVE_ID) -> Dict[str, Any]:
+    """Return server health and verify end-to-end device reachability.
+
+    Unlike a socket-level check, this sends a real Modbus request (read 1 holding
+    register at address 0) so it catches cases where the TCP session is open but
+    the device is unresponsive.
+    """
     client = ctx.request_context.lifespan_context.modbus_client
+    socket_connected = bool(getattr(client, "connected", False))
+
+    device_reachable = False
+    probe_latency_ms: Optional[float] = None
+    probe_error: Optional[str] = None
+
+    async def _probe():
+        return await client.read_holding_registers(address=0, count=1, slave=slave_id)
+
+    probe_result, probe_err, probe_ms, _ = await _retry_call(
+        ctx, "ping_probe", _probe, 0, MODBUS_TOOL_TIMEOUT, client=client
+    )
+    probe_latency_ms = round(probe_ms, 3)
+    if probe_err is not None:
+        probe_error = probe_err
+    elif hasattr(probe_result, "isError") and probe_result.isError():
+        probe_error = str(probe_result)
+    else:
+        device_reachable = True
+
     status = {
-        "connected": bool(getattr(client, "connected", False)),
+        "socket_connected": socket_connected,
+        "device_reachable": device_reachable,
+        "probe_latency_ms": probe_latency_ms,
+        "probe_error": probe_error,
         "type": MODBUS_TYPE,
         "host": MODBUS_HOST if MODBUS_TYPE in {"tcp", "udp"} else None,
         "port": MODBUS_PORT if MODBUS_TYPE in {"tcp", "udp"} else None,
@@ -801,4 +855,4 @@ async def ping(ctx: Context) -> Dict[str, Any]:
         "tool_timeout": MODBUS_TOOL_TIMEOUT,
         "tag_count": len(_TAG_MAP) if _TAG_MAP else 0,
     }
-    return _make_result(True, data=status)
+    return _make_result(device_reachable, data=status, error=probe_error if not device_reachable else None)
