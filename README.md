@@ -1,5 +1,9 @@
 # IndustriConnect MCP Suite
 
+[![License: MIT](https://img.shields.io/github/license/IndustriAgents/IndustriConnect)](LICENSE)
+[![MCP](https://img.shields.io/badge/Model_Context_Protocol-server_suite-0b7285)](https://modelcontextprotocol.io)
+[![Protocols](https://img.shields.io/badge/protocols-10-4c6ef5)](#repository-layout)
+
 A collection of Model Context Protocol (MCP) servers and tools for industrial automation protocols. This repo lets AI assistants and other MCP‑compatible clients talk to real (or simulated) PLCs and control systems using familiar protocols like Modbus, MQTT/Sparkplug B, OPC UA, BACnet, DNP3, EtherCAT, EtherNet/IP, PROFIBUS, PROFINET, and Siemens S7 (S7comm).
 
 <img width="1456" height="774" alt="Screenshot 2025-12-08 at 21 32 53" src="https://github.com/user-attachments/assets/de160a10-9def-466c-a679-7c6f08fe91d1" />
@@ -205,14 +209,23 @@ For a deeper dive into the motivation, architecture, and design decisions behind
 
 ---
 
-## Contributing & Roadmap
+## Contributing
 
-- Contributions are welcome as:
-  - New tools or coverage within an existing protocol
-  - Improvements to mocks and test scenarios
-  - Documentation updates and examples
+Contributions are welcome — new tools or wider coverage in an existing
+protocol, better mocks and test scenarios, documentation and examples, or a
+protocol the suite does not cover yet.
 
-Please open issues or pull requests in the relevant project, following any contribution guidelines in that folder’s README or roadmap.
+[**CONTRIBUTING.md**](CONTRIBUTING.md) covers the layout every protocol project
+follows, how to run a server against its mock, and the three invariants that
+keep all ten consistent. Please also read the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+These servers talk to industrial equipment, and most of the protocols they
+speak have no authentication of their own. [**SECURITY.md**](SECURITY.md)
+explains how to run them safely and how to report a vulnerability privately —
+please do not open a public issue for one.
 
 ## 📌 Citation
 If you use this work, please cite:
@@ -227,3 +240,10 @@ If you use this work, please cite:
   primaryClass={cs.SE},
   url={https://arxiv.org/abs/2603.24703}
 }
+```
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE).
