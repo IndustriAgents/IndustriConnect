@@ -24,14 +24,14 @@ The `mcp-manager-ui` project adds a web UI for working with these servers and ot
 Top‑level structure:
 
 ```text
-IndustriConnect-MCPs/
+IndustriConnect/
 ├── BACnet-Project/      # BACnet/IP MCP server + mock device
 ├── DNP3-Project/        # DNP3 MCP server + mock outstation
 ├── EtherCAT-Project/    # EtherCAT MCP server + mock slave
 ├── EtherNetIP-Project/  # EtherNet/IP MCP server + mock PLC
 ├── MODBUS-Project/      # Modbus MCP server + mock device
 ├── MQTT-Project/        # MQTT + Sparkplug B MCP server + mock broker
-├── OPCUA-Project/       # OPC UA MCP server + local OPC UA server
+├── OPCUA-Project/       # submodule -> IndustriAgents/OPCUA-MCP (see note below)
 ├── PROFIBUS-Project/    # PROFIBUS DP/PA MCP server + mock slave
 ├── PROFINET-Project/    # PROFINET MCP server + mock IO device
 ├── S7comm-Project/      # Siemens S7 MCP server + mock PLC
@@ -77,9 +77,10 @@ High‑level summary of each protocol project:
 - `MQTT-Project/`
   - **mqtt-python** – MQTT + Sparkplug B MCP server (publish, subscribe, Sparkplug lifecycle)
   - **mqtt-mock-server** – Mock MQTT broker + Sparkplug edge nodes
-- `OPCUA-Project/`
-  - **opcua-mcp-server** – OPC UA MCP server (read/write nodes, browse, methods, bulk operations)
-  - **opcua-local-server** – Rich mock OPC UA server simulating an industrial plant
+- `OPCUA-Project/` — git submodule tracking [IndustriAgents/OPCUA-MCP](https://github.com/IndustriAgents/OPCUA-MCP)
+  - **packages/server-python** – OPC UA MCP server (read/write nodes, browse, methods, bulk operations)
+  - **packages/server-node** – the same tool contract on Node, published to npm
+  - **packages/mock-server** – Rich mock OPC UA server simulating an industrial plant
 - `BACnet-Project/`
   - **bacnet-python** – BACnet/IP MCP server
   - **bacnet-mock-device** – Mock BACnet device for discovery and property access tests
@@ -136,6 +137,11 @@ Across all protocol servers:
 ---
 
 ## Quick Start (Example: Modbus)
+
+> **Cloning:** `OPCUA-Project/` is a git submodule. Clone with
+> `git clone --recurse-submodules https://github.com/IndustriAgents/IndustriConnect.git`,
+> or run `git submodule update --init --recursive` in an existing clone.
+> Pull the latest OPC UA server with `git submodule update --remote OPCUA-Project`.
 
 1. **Start the Modbus mock device**
 

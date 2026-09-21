@@ -1,0 +1,4 @@
+[submodule "OPCUA-Project"]
+	path = OPCUA-Project
+	url = https://github.com/IndustriAgents/OPCUA-MCP.git
+	branch = main

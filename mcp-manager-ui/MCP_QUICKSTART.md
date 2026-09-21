@@ -56,8 +56,8 @@ uv run mqtt-mcp
 
 For OPC UA MCP server:
 ```bash
-cd /Users/mx/Documents/IndustriConnect-MCPs/OPCUA-Project/opcua-mcp-server
-uv run opcua-mcp-server.py
+cd /Users/mx/Documents/IndustriConnect-MCPs/OPCUA-Project/packages/server-python
+uv run opcua-mcp-server
 ```
 
 ### 3. Connect in the UI

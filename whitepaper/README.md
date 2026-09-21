@@ -126,9 +126,9 @@ Use cases:
 
 ### 4.3 OPC UA
 
-- **Project**: `OPCUA-Project/`
-- **MCP server**: `opcua-mcp-server`
-- **Mock**: `opcua-local-server`
+- **Project**: `OPCUA-Project/` (submodule — [IndustriAgents/OPCUA-MCP](https://github.com/IndustriAgents/OPCUA-MCP))
+- **MCP server**: `packages/server-python` (also `packages/server-node`)
+- **Mock**: `packages/mock-server`
 
 Capabilities:
 

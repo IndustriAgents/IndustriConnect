@@ -1,0 +1,51 @@
+name: Sync OPCUA-Project submodule
+
+# Keeps OPCUA-Project pinned to the latest main of IndustriAgents/OPCUA-MCP.
+# Fires nightly, on manual dispatch, and on a repository_dispatch sent by
+# OPCUA-MCP's own CI when it pushes to main.
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+  repository_dispatch:
+    types: [opcua-mcp-updated]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Pull latest OPCUA-MCP main
+        id: bump
+        run: |
+          git submodule update --remote --init OPCUA-Project
+          if git diff --quiet -- OPCUA-Project; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Submodule already at the latest main."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "rev=$(git -C OPCUA-Project rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+            echo "subject=$(git -C OPCUA-Project log -1 --pretty=%s)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open bump PR
+        if: steps.bump.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: auto/bump-opcua-project
+          commit-message: "chore: bump OPCUA-Project to ${{ steps.bump.outputs.rev }}"
+          title: "chore: bump OPCUA-Project to ${{ steps.bump.outputs.rev }}"
+          body: |
+            Automated submodule bump of `OPCUA-Project`
+            → [IndustriAgents/OPCUA-MCP@${{ steps.bump.outputs.rev }}](https://github.com/IndustriAgents/OPCUA-MCP/commit/${{ steps.bump.outputs.rev }})
+
+            Latest upstream commit: ${{ steps.bump.outputs.subject }}
+          labels: automated, submodule
+          delete-branch: true
