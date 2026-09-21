@@ -1,7 +1,26 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChatMessage } from '../types';
 import { MCPServer } from '../types/mcp-types';
 import { format } from 'date-fns';
+import { useTheme } from './ThemeProvider';
+import {
+  IconClose,
+  IconHelp,
+  IconLogs,
+  IconMenu,
+  IconMoon,
+  IconPlus,
+  IconSend,
+  IconServer,
+  IconSettings,
+  IconSun,
+  IconTerminal,
+  IconUser,
+} from './Icons';
+
+/** Width at which the sidebar stops being a grid column — keep in step with
+ *  the `max-width: 900px` drawer block in src/styles/app.css. */
+const DRAWER_BREAKPOINT = 900;
 
 interface IndustrialUIProps {
   messages: ChatMessage[];
@@ -13,6 +32,20 @@ interface IndustrialUIProps {
   onOpenSettings: () => void;
 }
 
+const statusDot = (status: MCPServer['status']) => {
+  if (status === 'connected') return 'dot ok';
+  if (status === 'connecting') return 'dot warn';
+  if (status === 'error') return 'dot alert';
+  return 'dot';
+};
+
+const statusLabel = (status: MCPServer['status']) => {
+  if (status === 'connected') return 'connected — click to disconnect';
+  if (status === 'connecting') return 'connecting';
+  if (status === 'error') return 'error — click to retry';
+  return 'disconnected — click to connect';
+};
+
 export default function IndustrialUI({
   messages,
   onSendMessage,
@@ -20,261 +53,324 @@ export default function IndustrialUI({
   mcpServers,
   onMCPConnect,
   onMCPDisconnect,
-  onOpenSettings
+  onOpenSettings,
 }: IndustrialUIProps) {
   const [input, setInput] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  const connectedCount = mcpServers.filter((s) => s.status === 'connected').length;
 
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  // Grow the composer with its content instead of scrolling a one-line box.
+  // Capped in CSS via max-height, which this measurement respects.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    menuButtonRef.current?.focus();
+  }, []);
+
+  // Escape closes the drawer, and growing past the breakpoint drops it — a
+  // drawer left "open" on a rotated tablet would otherwise pin a stale scrim.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeDrawer();
+    };
+    const onResize = () => {
+      if (window.innerWidth > DRAWER_BREAKPOINT) setDrawerOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [drawerOpen, closeDrawer]);
+
+  const send = () => {
+    const content = input.trim();
+    if (!content || isLoading) return;
+    onSendMessage(content);
+    setInput('');
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (input.trim() && !isLoading) {
-        onSendMessage(input);
-        setInput('');
-      }
+      send();
     }
   };
 
-  const handleSend = () => {
-    if (input.trim() && !isLoading) {
-      onSendMessage(input);
-      setInput('');
+  const handleServerClick = (server: MCPServer) => {
+    if (server.status === 'connected') {
+      onMCPDisconnect(server.id);
+    } else {
+      onMCPConnect(server.id);
     }
+    setDrawerOpen(false);
+  };
+
+  const openSettings = () => {
+    setDrawerOpen(false);
+    onOpenSettings();
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f6f7f8] dark:bg-[#101922] text-slate-900 dark:text-slate-100 font-sans">
-      {/* Sidebar Navigation */}
-      <aside className="w-64 flex flex-col border-r border-slate-200 dark:border-[#233648] bg-[#f6f7f8] dark:bg-[#101922]">
-        <div className="p-6 flex items-center gap-3">
-          <div className="size-8 bg-slate-900 dark:bg-slate-100 rounded flex items-center justify-center text-white dark:text-slate-900">
-            <span className="material-symbols-outlined">terminal</span>
-          </div>
-          <div>
-            <h1 className="text-sm font-bold tracking-tight uppercase">IndustriConnect</h1>
-            <p className="text-[10px] text-slate-500 dark:text-[#92adc9] uppercase font-medium">Automation OS v2.4</p>
-          </div>
+    <div className={`app${drawerOpen ? ' is-drawer-open' : ''}`}>
+      {drawerOpen && (
+        <button
+          type="button"
+          className="sb-scrim"
+          aria-label="Close navigation"
+          onClick={closeDrawer}
+        />
+      )}
+
+      {/* ── Sidebar / drawer ── */}
+      <aside className="sidebar" id="app-sidebar" aria-label="Servers and account">
+        <div className="sb-brand">
+          <span className="brand-wordmark bw-sb" role="img" aria-label="IndustriAgents">
+            <img className="bw-mark" src="/assets/logo-mark.svg" alt="" aria-hidden="true" />
+            <span className="bw-name">
+              IndustriConnect
+              <small className="sb-brand-sub">MCP Manager</small>
+            </span>
+          </span>
+          <button type="button" className="sb-close" onClick={closeDrawer} aria-label="Close navigation">
+            <IconClose />
+          </button>
         </div>
 
-        <nav className="flex-1 px-4 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
-          <div>
-            <div className="flex items-center justify-between px-3 mb-2">
-                <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Active Nodes</p>
-                <button
-                    onClick={onOpenSettings}
-                    className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-                    title="Configure Servers"
-                >
-                    <span className="material-symbols-outlined text-[16px]">add</span>
-                </button>
-            </div>
-            <div className="flex flex-col gap-1">
-              {mcpServers.map(server => (
-                <div
-                  key={server.id}
-                  onClick={() => server.status === 'connected' ? onMCPDisconnect(server.id) : onMCPConnect(server.id)}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                    server.status === 'connected'
-                      ? 'bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700'
-                      : 'hover:bg-slate-100 dark:hover:bg-[#233648] text-slate-500'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[20px]">hard_drive</span>
-                    <span className="text-sm font-medium truncate max-w-[120px]">{server.name}</span>
-                  </div>
-                  <div className={`size-2 rounded-full ${
-                    server.status === 'connected'
-                      ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]'
-                      : server.status === 'connecting'
-                        ? 'bg-yellow-500 animate-pulse'
-                        : 'bg-red-500/50'
-                  }`}></div>
-                </div>
-              ))}
-              {mcpServers.length === 0 && (
-                 <div
-                    onClick={onOpenSettings}
-                    className="px-3 py-2 text-xs text-slate-500 italic hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors"
-                 >
-                    No servers configured. Click to add +
-                 </div>
-              )}
-            </div>
-          </div>
+        <div className="sb-section">
+          <span>Active nodes</span>
+          <button
+            type="button"
+            className="sb-section-action"
+            onClick={openSettings}
+            aria-label="Configure servers"
+            title="Configure servers"
+          >
+            <IconPlus />
+          </button>
+        </div>
+
+        <nav className="sb-nav">
+          {mcpServers.map((server) => (
+            <button
+              type="button"
+              key={server.id}
+              onClick={() => handleServerClick(server)}
+              className={`sb-link${server.status === 'connected' ? ' is-active' : ''}`}
+              title={`${server.name} — ${statusLabel(server.status)}`}
+            >
+              <IconServer className="sb-ico" />
+              <span className="sb-name">{server.name}</span>
+              <span className={statusDot(server.status)} />
+              <span className="sr-only">{statusLabel(server.status)}</span>
+            </button>
+          ))}
+
+          {mcpServers.length === 0 && (
+            <button type="button" className="sb-empty" onClick={openSettings}>
+              No servers configured yet — add one to start talking to a PLC.
+            </button>
+          )}
         </nav>
 
-        <div className="p-4 border-t border-slate-200 dark:border-[#233648] flex flex-col gap-1">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-[#233648] transition-colors cursor-pointer opacity-70">
-            <span className="material-symbols-outlined text-[20px] text-slate-400">help</span>
-            <p className="text-sm font-medium">Support</p>
-          </div>
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-[#233648] transition-colors cursor-pointer opacity-70">
-            <span className="material-symbols-outlined text-[20px] text-slate-400">receipt_long</span>
-            <p className="text-sm font-medium">System Logs</p>
-          </div>
-          <div className="mt-2 flex items-center gap-3 px-3 py-2">
-            <div className="size-8 rounded-full bg-slate-200 dark:bg-[#233648] bg-center bg-cover flex items-center justify-center">
-                <span className="material-symbols-outlined text-slate-400">person</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold truncate">Operator</p>
-              <p className="text-[10px] text-slate-500">Shift Active</p>
-            </div>
+        <div className="sb-footer">
+          <button type="button" className="sb-foot-link" onClick={openSettings}>
+            <IconLogs />
+            <span>Server configuration</span>
+          </button>
+          <a
+            className="sb-foot-link"
+            href="https://github.com/yashika-sharma/IndustriConnect-MCPs"
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            <IconHelp />
+            <span>Documentation</span>
+          </a>
+
+          <div className="sb-user">
+            <span className="sb-user-mark">
+              <IconUser />
+            </span>
+            <span className="sb-user-text">
+              <b>Operator</b>
+              <small>Shift active</small>
+            </span>
           </div>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col relative bg-[#f6f7f8] dark:bg-[#101922]">
-        {/* Top Header Stats */}
-        <header className="flex items-center justify-end px-8 py-4 border-b border-slate-200 dark:border-[#233648]">
-          <div className="flex items-center gap-3">
-            <button className="p-2 rounded hover:bg-slate-100 dark:hover:bg-[#233648] transition-colors relative">
-              <span className="material-symbols-outlined text-[20px]">notifications</span>
-              <span className="absolute top-2 right-2 size-2 bg-slate-900 dark:bg-white rounded-full border-2 border-[#f6f7f8] dark:border-[#101922]"></span>
-            </button>
-            <button
-                onClick={onOpenSettings}
-                className="p-2 rounded hover:bg-slate-100 dark:hover:bg-[#233648] transition-colors"
-            >
-              <span className="material-symbols-outlined text-[20px]">settings</span>
-            </button>
-          </div>
-        </header>
-
-        {/* Chat / Message History */}
-        <div className="flex-1 overflow-y-auto px-8 py-6 custom-scrollbar space-y-6">
-            {messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-50">
-                    <span className="material-symbols-outlined text-6xl mb-4">smart_toy</span>
-                    <p>System ready. Waiting for commands.</p>
-                </div>
-            )}
-
-            {messages.map((msg) => (
-                <div key={msg.id} className={`flex gap-4 max-w-4xl mx-auto ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                    {msg.role !== 'user' && (
-                        <div className="size-10 rounded-lg bg-slate-200 dark:bg-[#233648] flex items-center justify-center shrink-0">
-                            <span className="material-symbols-outlined text-slate-700 dark:text-slate-300">smart_toy</span>
-                        </div>
-                    )}
-
-                    <div className={`flex flex-col gap-1.5 pt-1 ${msg.role === 'user' ? 'items-end' : ''}`}>
-                        <div className="flex items-center gap-3">
-                            {msg.role === 'user' ? (
-                                <>
-                                    <p className="text-[11px] text-slate-400 font-medium uppercase text-right">{format(msg.timestamp, 'p')}</p>
-                                    <p className="text-sm font-bold">Operator</p>
-                                </>
-                            ) : (
-                                <>
-                                    <p className="text-sm font-bold">Automation System</p>
-                                    <p className="text-[11px] text-slate-400 font-medium uppercase">{format(msg.timestamp, 'p')}</p>
-                                </>
-                            )}
-                        </div>
-
-                        <div className={`text-sm leading-relaxed max-w-2xl ${
-                            msg.role === 'user'
-                                ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-xl rounded-tr-none px-4 py-3 shadow-lg shadow-black/5 max-w-lg'
-                                : 'text-slate-600 dark:text-slate-300 space-y-3'
-                        }`}>
-                           {msg.content}
-
-                           {/* Render tool calls if any */}
-                           {msg.toolCalls && msg.toolCalls.length > 0 && (
-                               <div className="mt-2 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-lg p-3 font-mono text-xs space-y-1">
-                                   {msg.toolCalls.map(tool => (
-                                       <div key={tool.id} className="border-b border-slate-200 dark:border-slate-800 last:border-0 pb-1 last:pb-0 mb-1 last:mb-0">
-                                           <div className="flex justify-between">
-                                               <span className="text-slate-500">Tool: {tool.toolName}</span>
-                                               <span className={tool.result?.isError ? "text-red-500" : "text-green-500"}>
-                                                   {tool.result?.isError ? 'ERROR' : 'SUCCESS'}
-                                               </span>
-                                           </div>
-                                           {tool.result?.content && (
-                                               <div className="text-slate-400 mt-1 whitespace-pre-wrap">
-                                                   {JSON.stringify(tool.result.result || tool.result.content, null, 2)}
-                                               </div>
-                                           )}
-                                       </div>
-                                   ))}
-                               </div>
-                           )}
-
-                           {msg.error && (
-                               <div className="mt-2 text-red-500 text-xs bg-red-50 dark:bg-red-900/20 p-2 rounded border border-red-200 dark:border-red-900/50">
-                                   Error processing request.
-                               </div>
-                           )}
-                        </div>
-                    </div>
-
-                    {msg.role === 'user' && (
-                        <div className="size-10 rounded-lg bg-slate-800 dark:bg-slate-700 flex items-center justify-center shrink-0 overflow-hidden border border-slate-600">
-                             <span className="material-symbols-outlined text-white">person</span>
-                        </div>
-                    )}
-                </div>
-            ))}
-
-            {isLoading && (
-                 <div className="flex gap-4 max-w-4xl mx-auto">
-                    <div className="size-10 rounded-lg bg-slate-200 dark:bg-[#233648] flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-slate-700 dark:text-slate-300">smart_toy</span>
-                    </div>
-                    <div className="flex flex-col gap-1.5 pt-1">
-                        <div className="flex items-center gap-3">
-                            <p className="text-sm font-bold">Automation System</p>
-                        </div>
-                         <div className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
-                            <span className="animate-pulse">Processing...</span>
-                         </div>
-                    </div>
-                </div>
-            )}
-            <div ref={messagesEndRef} />
+      {/* ── Topbar ── */}
+      <header className="topbar">
+        <div className="tb-left">
+          <button
+            type="button"
+            ref={menuButtonRef}
+            className="tb-menu"
+            onClick={() => setDrawerOpen((open) => !open)}
+            aria-label="Open navigation"
+            aria-expanded={drawerOpen}
+            aria-controls="app-sidebar"
+          >
+            <IconMenu />
+          </button>
+          <p className="tb-crumb">
+            IndustriConnect / <b>Console</b>
+          </p>
         </div>
 
-        {/* Command Input Field */}
-        <div className="p-8 pt-0">
-          <div className="max-w-4xl mx-auto">
-            <div className="relative group">
+        <div className="tb-right">
+          {/* On a phone the label is dropped for width, so the count alone is
+              left on screen — the full reading has to stay reachable by tooltip
+              and by assistive tech, which `display: none` would otherwise cut. */}
+          <span
+            className={`tb-pill${connectedCount > 0 ? ' is-live' : ''}`}
+            title={`${connectedCount} of ${mcpServers.length} nodes connected`}
+            aria-label={`${connectedCount} of ${mcpServers.length} nodes connected`}
+          >
+            <span className="live-dot" />
+            <span aria-hidden="true">{connectedCount}</span>
+            <span className="pill-text" aria-hidden="true">
+              {connectedCount === 1 ? 'node live' : 'nodes live'}
+            </span>
+          </span>
+          <button
+            type="button"
+            className="tb-icon"
+            onClick={toggleTheme}
+            aria-label="Toggle light / dark theme"
+            title="Toggle light / dark"
+          >
+            {theme === 'dark' ? <IconSun /> : <IconMoon />}
+          </button>
+          <button
+            type="button"
+            className="tb-icon"
+            onClick={onOpenSettings}
+            aria-label="Server configuration"
+            title="Server configuration"
+          >
+            <IconSettings />
+          </button>
+        </div>
+      </header>
+
+      {/* ── Console ── */}
+      <main className="main">
+        <div className="transcript">
+          <div className="transcript-inner">
+            {messages.length === 0 && !isLoading && (
+              <div className="console-empty">
+                <IconTerminal className="ce-mark" />
+                <h2>System ready</h2>
+                <p>
+                  Connect a node from the sidebar, then ask for a reading, a setpoint, or a
+                  status sweep in plain language.
+                </p>
+                <p className="ce-hint">Awaiting command</p>
+              </div>
+            )}
+
+            {messages.map((msg) => {
+              const isOperator = msg.role === 'user';
+              return (
+                <article
+                  key={msg.id}
+                  className={`turn ${isOperator ? 'turn--operator' : 'turn--system'}`}
+                >
+                  <header className="turn-head">
+                    <span className="turn-who">{isOperator ? 'Operator' : 'Automation system'}</span>
+                    <time className="turn-time" dateTime={new Date(msg.timestamp).toISOString()}>
+                      {format(msg.timestamp, 'p')}
+                    </time>
+                  </header>
+
+                  <div className="turn-body">{msg.content}</div>
+
+                  {msg.toolCalls && msg.toolCalls.length > 0 && (
+                    <ul className="turn-calls">
+                      {msg.toolCalls.map((tool) => (
+                        <li key={tool.id} className={tool.result?.isError ? 'is-error' : undefined}>
+                          <div className="turn-call-head">
+                            <code>{tool.toolName}</code>
+                            <span className="turn-call-outcome">
+                              {tool.result?.isError ? 'DENIED / FAILED' : 'OK'}
+                            </span>
+                          </div>
+                          {tool.result?.content && (
+                            <pre className="turn-call-result">
+                              {JSON.stringify(tool.result.result ?? tool.result.content, null, 2)}
+                            </pre>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {msg.error && <p className="turn-error">The request did not complete.</p>}
+                </article>
+              );
+            })}
+
+            {isLoading && (
+              <article className="turn turn--system">
+                <header className="turn-head">
+                  <span className="turn-who">Automation system</span>
+                </header>
+                <p className="turn-pending" role="status">
+                  Processing…
+                </p>
+              </article>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {/* ── Composer ── */}
+        <div className="composer">
+          <div className="composer-inner">
+            <div className="composer-field">
               <textarea
+                ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="w-full bg-white dark:bg-[#1a2632] border border-slate-200 dark:border-[#324d67] rounded-xl px-4 py-4 pr-16 focus:ring-1 focus:ring-slate-400 focus:border-slate-400 text-sm placeholder-slate-400 dark:placeholder-slate-500 resize-none transition-all shadow-xl shadow-black/5 text-slate-900 dark:text-white"
-                placeholder="Type an industrial command or ask for status..."
+                placeholder="Type an industrial command or ask for status…"
+                aria-label="Command input"
                 rows={1}
               />
-              <div className="absolute right-3 bottom-3 flex gap-2">
-                <button
-                    onClick={handleSend}
-                    disabled={isLoading || !input.trim()}
-                    className="p-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-lg hover:opacity-90 transition-opacity shadow-lg shadow-black/10 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="material-symbols-outlined text-[20px]">send</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                className="composer-send"
+                onClick={send}
+                disabled={isLoading || !input.trim()}
+                aria-label="Send command"
+              >
+                <IconSend />
+              </button>
             </div>
-            <div className="mt-3 flex items-center justify-end px-2">
-              <p className="text-[10px] text-slate-400 italic">Press Enter to dispatch, Shift+Enter for new line</p>
-            </div>
+            <p className="composer-note">Enter to dispatch · Shift + Enter for a new line</p>
           </div>
         </div>
-
-        {/* Background Gradient Overlay (Minimalist Claude style) */}
-        <div className="absolute inset-0 pointer-events-none opacity-5 dark:opacity-[0.03] bg-gradient-to-tr from-slate-500 via-transparent to-transparent"></div>
       </main>
     </div>
   );

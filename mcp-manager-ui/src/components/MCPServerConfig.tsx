@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Plus, X, Upload, Download } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { MCPServersConfig, MCPServerConfig } from '../types/mcp-types';
 import { importCursorConfig, exportCursorConfig } from '../utils/mcp-storage';
+import { IconClose, IconDownload, IconPlus, IconUpload } from './Icons';
 
 interface MCPServerConfigProps {
     config: MCPServersConfig;
@@ -15,11 +15,14 @@ export default function MCPServerConfigPanel({
     onClose,
 }: MCPServerConfigProps) {
     const [editMode, setEditMode] = useState<'form' | 'json'>('form');
-    const [selectedServer, setSelectedServer] = useState<string | null>(null);
     const [jsonInput, setJsonInput] = useState(exportCursorConfig(config));
     const [jsonError, setJsonError] = useState<string | null>(null);
+    const [formError, setFormError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
 
-    // Form state for adding/editing servers
+    const panelRef = useRef<HTMLDivElement>(null);
+
+    // Form state for adding servers
     const [formData, setFormData] = useState<{
         name: string;
         command: string;
@@ -32,33 +35,66 @@ export default function MCPServerConfigPanel({
         env: '',
     });
 
+    // Escape closes the dialog, as in every other modal the operator meets.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', onKey);
+        panelRef.current?.focus();
+        return () => window.removeEventListener('keydown', onKey);
+    }, [onClose]);
+
+    // Transient confirmations replace the old alert() calls, which blocked the
+    // page and — on the browser-automation path — froze the whole session.
+    useEffect(() => {
+        if (!notice) return;
+        const t = window.setTimeout(() => setNotice(null), 2600);
+        return () => window.clearTimeout(t);
+    }, [notice]);
+
     const handleAddServer = () => {
-        if (!formData.name || !formData.command) {
-            alert('Server name and command are required');
+        if (!formData.name.trim() || !formData.command.trim()) {
+            setFormError('Server name and command are both required.');
             return;
         }
 
-        const newConfig = { ...config };
+        let env: Record<string, string> | undefined;
+        if (formData.env.trim()) {
+            try {
+                env = JSON.parse(formData.env);
+            } catch {
+                setFormError('Environment variables must be a valid JSON object.');
+                return;
+            }
+        }
+
+        const newConfig: MCPServersConfig = {
+            ...config,
+            mcpServers: { ...config.mcpServers },
+        };
         const serverConfig: MCPServerConfig = {
-            command: formData.command,
-            args: formData.args.split('\n').filter(a => a.trim()),
-            env: formData.env ? JSON.parse(formData.env) : undefined,
+            command: formData.command.trim(),
+            args: formData.args.split('\n').filter((a) => a.trim()),
+            env,
         };
 
-        newConfig.mcpServers[formData.name] = serverConfig;
+        newConfig.mcpServers[formData.name.trim()] = serverConfig;
         onConfigChange(newConfig);
 
-        // Reset form
+        setFormError(null);
+        setNotice(`Added ${formData.name.trim()}.`);
         setFormData({ name: '', command: '', args: '', env: '' });
     };
 
     const handleDeleteServer = (serverName: string) => {
-        const newConfig = { ...config };
+        const newConfig: MCPServersConfig = {
+            ...config,
+            mcpServers: { ...config.mcpServers },
+        };
         delete newConfig.mcpServers[serverName];
         onConfigChange(newConfig);
-        if (selectedServer === serverName) {
-            setSelectedServer(null);
-        }
+        setNotice(`Removed ${serverName}.`);
     };
 
     const handleImportJSON = () => {
@@ -67,219 +103,244 @@ export default function MCPServerConfigPanel({
             onConfigChange(imported);
             setJsonError(null);
             setEditMode('form');
+            setNotice('Configuration applied.');
         } else {
-            setJsonError('Invalid JSON format');
+            setJsonError('That is not a valid mcpServers configuration.');
         }
     };
 
-    const handleExportJSON = () => {
+    const handleExportJSON = async () => {
         const json = exportCursorConfig(config);
-        navigator.clipboard.writeText(json);
-        alert('Configuration copied to clipboard!');
+        try {
+            await navigator.clipboard.writeText(json);
+            setNotice('Configuration copied to clipboard.');
+        } catch {
+            // Clipboard access is refused without a user gesture in some
+            // browsers, and over plain HTTP. Show the JSON so it can be copied
+            // by hand rather than failing silently.
+            setJsonInput(json);
+            setEditMode('json');
+            setNotice('Clipboard unavailable — copy the JSON below.');
+        }
     };
 
     const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const content = e.target?.result as string;
-                const imported = importCursorConfig(content);
-                if (imported) {
-                    onConfigChange(imported);
-                    setJsonError(null);
-                } else {
-                    setJsonError('Invalid configuration file');
-                }
-            };
-            reader.readAsText(file);
-        }
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const content = e.target?.result as string;
+            const imported = importCursorConfig(content);
+            if (imported) {
+                onConfigChange(imported);
+                setJsonInput(exportCursorConfig(imported));
+                setJsonError(null);
+                setNotice(`Imported ${file.name}.`);
+            } else {
+                setJsonError(`${file.name} is not a valid configuration file.`);
+                setEditMode('json');
+            }
+        };
+        reader.readAsText(file);
+        // Allow the same file to be picked twice in a row.
+        event.target.value = '';
     };
 
+    const serverEntries = Object.entries(config.mcpServers);
+
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-background border border-border rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-                {/* Header */}
-                <div className="p-4 border-b border-border flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">MCP Server Configuration</h2>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-accent/50 rounded-md transition-colors"
-                    >
-                        <X className="w-4 h-4" />
+        <div
+            className="modal-scrim"
+            onMouseDown={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
+            <div
+                className="modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="mcp-config-title"
+                ref={panelRef}
+                tabIndex={-1}
+            >
+                <div className="modal-head">
+                    <h2 id="mcp-config-title">Server configuration</h2>
+                    <button type="button" className="tb-icon" onClick={onClose} aria-label="Close">
+                        <IconClose />
                     </button>
                 </div>
 
-                {/* Mode Switcher */}
-                <div className="p-4 border-b border-border flex gap-2">
-                    <button
-                        onClick={() => setEditMode('form')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${editMode === 'form'
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted hover:bg-muted/80'
-                            }`}
-                    >
-                        Form Editor
-                    </button>
-                    <button
-                        onClick={() => setEditMode('json')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${editMode === 'json'
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted hover:bg-muted/80'
-                            }`}
-                    >
-                        JSON Editor
-                    </button>
-                    <div className="flex-1" />
-                    <button
-                        onClick={handleExportJSON}
-                        className="px-4 py-2 rounded-md text-sm font-medium bg-muted hover:bg-muted/80 flex items-center gap-2"
-                    >
-                        <Download className="w-4 h-4" />
+                <div className="modal-toolbar">
+                    <div className="segmented" role="tablist" aria-label="Editor mode">
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={editMode === 'form'}
+                            className={`segment${editMode === 'form' ? ' is-active' : ''}`}
+                            onClick={() => setEditMode('form')}
+                        >
+                            Form
+                        </button>
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={editMode === 'json'}
+                            className={`segment${editMode === 'json' ? ' is-active' : ''}`}
+                            onClick={() => setEditMode('json')}
+                        >
+                            JSON
+                        </button>
+                    </div>
+
+                    <div className="spacer" />
+
+                    <button type="button" className="btn" onClick={handleExportJSON}>
+                        <IconDownload />
                         Export
                     </button>
-                    <label className="px-4 py-2 rounded-md text-sm font-medium bg-muted hover:bg-muted/80 flex items-center gap-2 cursor-pointer">
-                        <Upload className="w-4 h-4" />
-                        Import File
+                    <label className="btn">
+                        <IconUpload />
+                        Import
                         <input
                             type="file"
-                            accept=".json"
+                            accept=".json,application/json"
                             onChange={handleFileImport}
-                            className="hidden"
+                            className="sr-only"
                         />
                     </label>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4">
+                <div className="modal-body">
+                    {notice && (
+                        <p className="field-note" role="status" style={{ marginBottom: 14 }}>
+                            {notice}
+                        </p>
+                    )}
+
                     {editMode === 'form' ? (
-                        <div className="space-y-6">
-                            {/* Existing Servers */}
-                            <div>
-                                <h3 className="text-sm font-semibold mb-3">Configured Servers</h3>
-                                {Object.keys(config.mcpServers).length === 0 ? (
-                                    <div className="text-sm text-muted-foreground text-center py-8">
-                                        No servers configured yet. Add one below.
-                                    </div>
+                        <>
+                            <section className="modal-section">
+                                <h3>Configured servers</h3>
+                                {serverEntries.length === 0 ? (
+                                    <p className="empty">Nothing configured yet.</p>
                                 ) : (
-                                    <div className="space-y-2">
-                                        {Object.entries(config.mcpServers).map(([name, serverConfig]) => (
-                                            <div
-                                                key={name}
-                                                className="p-3 border border-border rounded-md bg-muted/30"
-                                            >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="font-medium text-sm mb-1">{name}</div>
-                                                        <div className="text-xs text-muted-foreground font-mono truncate">
-                                                            {serverConfig.command} {serverConfig.args.join(' ')}
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => handleDeleteServer(name)}
-                                                        className="p-1 hover:bg-destructive/20 hover:text-destructive rounded-md transition-colors ml-2"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
+                                    <div className="server-rows">
+                                        {serverEntries.map(([name, serverConfig]) => (
+                                            <div key={name} className="server-row">
+                                                <div className="server-row-text">
+                                                    <b>{name}</b>
+                                                    <code>
+                                                        {serverConfig.command} {serverConfig.args.join(' ')}
+                                                    </code>
                                                 </div>
+                                                <button
+                                                    type="button"
+                                                    className="row-remove"
+                                                    onClick={() => handleDeleteServer(name)}
+                                                    aria-label={`Remove ${name}`}
+                                                    title={`Remove ${name}`}
+                                                >
+                                                    <IconClose />
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
                                 )}
-                            </div>
+                            </section>
 
-                            {/* Add New Server Form */}
-                            <div className="border-t border-border pt-6">
-                                <h3 className="text-sm font-semibold mb-3">Add New Server</h3>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">
-                                            Server Name <span className="text-destructive">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            placeholder="e.g., MQTT MCP (Python)"
-                                            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm"
-                                        />
-                                    </div>
+                            <section className="modal-section">
+                                <h3>Add a server</h3>
 
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">
-                                            Command <span className="text-destructive">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.command}
-                                            onChange={(e) => setFormData({ ...formData, command: e.target.value })}
-                                            placeholder="e.g., uv"
-                                            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">
-                                            Arguments (one per line)
-                                        </label>
-                                        <textarea
-                                            value={formData.args}
-                                            onChange={(e) => setFormData({ ...formData, args: e.target.value })}
-                                            placeholder="--directory&#10;/path/to/project&#10;run&#10;mqtt-mcp"
-                                            rows={4}
-                                            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">
-                                            Environment Variables (JSON object)
-                                        </label>
-                                        <textarea
-                                            value={formData.env}
-                                            onChange={(e) => setFormData({ ...formData, env: e.target.value })}
-                                            placeholder='{"MQTT_BROKER_URL": "mqtt://127.0.0.1:1883"}'
-                                            rows={3}
-                                            className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono"
-                                        />
-                                    </div>
-
-                                    <button
-                                        onClick={handleAddServer}
-                                        className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 flex items-center gap-2"
-                                    >
-                                        <Plus className="w-4 h-4" />
-                                        Add Server
-                                    </button>
+                                <div className="field">
+                                    <label htmlFor="srv-name">
+                                        Server name <span className="req">*</span>
+                                    </label>
+                                    <input
+                                        id="srv-name"
+                                        type="text"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        placeholder="MQTT MCP (Python)"
+                                    />
                                 </div>
-                            </div>
-                        </div>
+
+                                <div className="field">
+                                    <label htmlFor="srv-command">
+                                        Command <span className="req">*</span>
+                                    </label>
+                                    <input
+                                        id="srv-command"
+                                        type="text"
+                                        value={formData.command}
+                                        onChange={(e) => setFormData({ ...formData, command: e.target.value })}
+                                        placeholder="uv"
+                                    />
+                                </div>
+
+                                <div className="field">
+                                    <label htmlFor="srv-args">Arguments — one per line</label>
+                                    <textarea
+                                        id="srv-args"
+                                        value={formData.args}
+                                        onChange={(e) => setFormData({ ...formData, args: e.target.value })}
+                                        placeholder={'--directory\n/path/to/project\nrun\nmqtt-mcp'}
+                                        rows={4}
+                                    />
+                                </div>
+
+                                <div className="field">
+                                    <label htmlFor="srv-env">Environment variables — JSON object</label>
+                                    <textarea
+                                        id="srv-env"
+                                        value={formData.env}
+                                        onChange={(e) => setFormData({ ...formData, env: e.target.value })}
+                                        placeholder='{"MQTT_BROKER_URL": "mqtt://127.0.0.1:1883"}'
+                                        rows={3}
+                                    />
+                                </div>
+
+                                {formError && (
+                                    <p className="field-error" role="alert" style={{ marginBottom: 12 }}>
+                                        {formError}
+                                    </p>
+                                )}
+
+                                <button type="button" className="btn is-primary" onClick={handleAddServer}>
+                                    <IconPlus />
+                                    Add server
+                                </button>
+                            </section>
+                        </>
                     ) : (
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium mb-2">
-                                    JSON Configuration (Cursor Format)
+                        <section className="modal-section">
+                            <h3>mcpServers JSON — Cursor format</h3>
+                            <div className="field">
+                                <label htmlFor="srv-json" className="sr-only">
+                                    JSON configuration
                                 </label>
                                 <textarea
+                                    id="srv-json"
                                     value={jsonInput}
                                     onChange={(e) => {
                                         setJsonInput(e.target.value);
                                         setJsonError(null);
                                     }}
-                                    rows={20}
-                                    className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm font-mono"
+                                    rows={18}
+                                    spellCheck={false}
                                 />
                                 {jsonError && (
-                                    <div className="mt-2 text-sm text-destructive">{jsonError}</div>
+                                    <p className="field-error" role="alert">
+                                        {jsonError}
+                                    </p>
                                 )}
+                                <p className="field-note">
+                                    Applying replaces the whole server list.
+                                </p>
                             </div>
-                            <button
-                                onClick={handleImportJSON}
-                                className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90"
-                            >
-                                Apply JSON Configuration
+                            <button type="button" className="btn is-primary" onClick={handleImportJSON}>
+                                Apply configuration
                             </button>
-                        </div>
+                        </section>
                     )}
                 </div>
             </div>
