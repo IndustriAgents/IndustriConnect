@@ -50,10 +50,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  # The PR gets the labels "automated" and "submodule". Applying a label that
-  # does not exist yet creates it, which needs Issues write; once both labels
-  # exist in this repository, this line can go.
-  issues: write
+  # The PR gets the labels "automated" and "submodule", which already exist in
+  # this repository. If they are ever deleted, applying them recreates them,
+  # which needs "issues: write" here.
 
 # Nine protocol repos merging at about the same time send nine dispatches. Run
 # them one at a time so they never push to auto/bump-submodules concurrently.
@@ -192,6 +191,14 @@ jobs:
             [ -n "$key" ] || continue
             name=${key#submodule.}
             name=${name%.path}
+
+            # git submodule update skips a .gitmodules entry that has no
+            # gitlink in the tree (say, a folder removed without its entry),
+            # so skip it here too rather than failing every other pin with it.
+            if [ "$(git ls-tree HEAD -- "$path" | cut -d' ' -f1)" != 160000 ]; then
+              echo "::warning::${path}: listed in .gitmodules but not a submodule in HEAD; skipping. Remove the stale entry."
+              continue
+            fi
 
             old=$(git rev-parse "HEAD:${path}")
             new=$(git -C "$path" rev-parse HEAD)
