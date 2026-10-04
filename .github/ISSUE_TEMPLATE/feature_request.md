@@ -1,27 +1,26 @@
 ---
 name: Feature request
-about: Suggest a new tool, a new protocol, or an improvement
+about: Suggest a feature for mcp-manager-ui, a change across the suite, or a new protocol
 title: "[Feature] "
 labels: enhancement
 assignees: ""
 ---
 
+<!--
+A new tool or improvement for one protocol server or its mock belongs in that
+protocol's own repository. Each one is listed on the "New issue" page and in
+CONTRIBUTING.md. This template is for mcp-manager-ui, changes every server
+should make the same way, and protocols the suite does not cover yet.
+-->
+
 **What problem does this solve?**
 The use case, from the point of view of someone asking an agent to do something.
 
-**Which protocol project?**
-- [ ] BACnet
-- [ ] DNP3
-- [ ] EtherCAT
-- [ ] EtherNet/IP
-- [ ] Modbus
-- [ ] MQTT / Sparkplug B
-- [ ] OPC UA
-- [ ] PROFIBUS
-- [ ] PROFINET
-- [ ] S7comm
+**What would it change?**
 - [ ] mcp-manager-ui
-- [ ] A protocol not yet covered — which one:
+- [ ] Every protocol server, the same way (tool names, arguments, the envelope, configuration)
+- [ ] Suite docs or the whitepaper
+- [ ] A protocol not yet covered. Which one:
 
 **Proposed solution**
 If it is a new tool: its name, arguments, and what it returns. Tool names and
