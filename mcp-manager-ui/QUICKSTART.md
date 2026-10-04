@@ -5,6 +5,7 @@
 ```bash
 cd mcp-manager-ui
 npm install
+cd mcp-backend && npm install && cd ..
 ```
 
 ## Running the Application
@@ -63,7 +64,7 @@ which the UI already uses, and **Connect** fails. In PowerShell, run
 
 **Application won't start:**
 - Ensure Node.js 18+ is installed: `node --version`
-- Delete `node_modules` and reinstall: `rm -rf node_modules && npm install`
+- Delete `node_modules` and reinstall: `rm -rf node_modules mcp-backend/node_modules && npm install && (cd mcp-backend && npm install)`
 
 **Theme not working:**
 - Clear browser cache and reload

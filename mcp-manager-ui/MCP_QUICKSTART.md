@@ -52,6 +52,9 @@ You have three options:
 ### 2. Start the UI and Its Backend
 
 ```bash
+cd mcp-manager-ui
+npm install
+(cd mcp-backend && npm install)   # the backend has its own dependencies
 PORT=3003 npm run dev
 ```
 

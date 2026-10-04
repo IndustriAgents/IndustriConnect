@@ -115,6 +115,7 @@ For `mcp-manager-ui`:
 ```bash
 cd mcp-manager-ui
 npm install
+(cd mcp-backend && npm install)
 PORT=3003 npm run dev        # the UI expects mcp-backend on port 3003
 ```
 
