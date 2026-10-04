@@ -283,7 +283,7 @@ export default function MCPServerConfigPanel({
                                         id="srv-args"
                                         value={formData.args}
                                         onChange={(e) => setFormData({ ...formData, args: e.target.value })}
-                                        placeholder={'--directory\n/path/to/project\nrun\nmqtt-mcp'}
+                                        placeholder={'--directory\n/absolute/path/to/IndustriConnect/MQTT-Project/mqtt-python\nrun\nmqtt-mcp'}
                                         rows={4}
                                     />
                                 </div>
