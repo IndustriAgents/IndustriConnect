@@ -80,7 +80,7 @@ Key layers:
   - Returns structured `{ success, data, error, meta }` responses
 - **Device / Mock** – the actual industrial equipment or a simulated equivalent.
 
-Each protocol project in this repo hosts one MCP server and one or more mocks.
+Each protocol project hosts one MCP server and one or more mocks. It is developed in its own repository and pinned into the IndustriConnect repository as a git submodule (section 4 links each one).
 
 ---
 
@@ -90,7 +90,7 @@ Each protocol module follows the same pattern: a Python MCP server, plus a mock 
 
 ### 4.1 Modbus
 
-- **Project**: `MODBUS-Project/`
+- **Project**: `MODBUS-Project/` (submodule — [IndustriAgents/MODBUS-MCP](https://github.com/IndustriAgents/MODBUS-MCP))
 - **MCP server**: `modbus-python` (`modbus-mcp` entrypoint)
 - **Mock**: `modbus-mock-server`
 
@@ -108,7 +108,7 @@ Use cases:
 
 ### 4.2 MQTT + Sparkplug B
 
-- **Project**: `MQTT-Project/`
+- **Project**: `MQTT-Project/` (submodule — [IndustriAgents/MQTT-MCP](https://github.com/IndustriAgents/MQTT-MCP))
 - **MCP server**: `mqtt-python` (`mqtt-mcp`)
 - **Mock**: `mqtt-mock-server`
 
@@ -147,19 +147,19 @@ Use cases:
 
 Each of these protocol projects mirrors the same approach:
 
-- **BACnet-Project** – BACnet/IP devices for building automation
-- **DNP3-Project** – DNP3 outstations and SCADA points
-- **EtherCAT-Project** – EtherCAT slave discovery and PDO/SDO access
-- **EtherNetIP-Project** – Rockwell/AB controllers and tag operations
-- **PROFIBUS-Project** – PROFIBUS DP/PA bus scanning and cyclic data
-- **PROFINET-Project** – PROFINET IO devices, modules, and diagnostics
-- **S7comm-Project** – Siemens S7 PLCs via S7comm
+- **BACnet-Project** ([IndustriAgents/BACnet-MCP](https://github.com/IndustriAgents/BACnet-MCP)) – BACnet/IP devices for building automation
+- **DNP3-Project** ([IndustriAgents/DNP3-MCP](https://github.com/IndustriAgents/DNP3-MCP)) – DNP3 outstations and SCADA points
+- **EtherCAT-Project** ([IndustriAgents/EtherCAT-MCP](https://github.com/IndustriAgents/EtherCAT-MCP)) – EtherCAT slave discovery and PDO/SDO access
+- **EtherNetIP-Project** ([IndustriAgents/EtherNetIP-MCP](https://github.com/IndustriAgents/EtherNetIP-MCP)) – Rockwell/AB controllers and tag operations
+- **PROFIBUS-Project** ([IndustriAgents/PROFIBUS-MCP](https://github.com/IndustriAgents/PROFIBUS-MCP)) – PROFIBUS DP/PA bus scanning and cyclic data
+- **PROFINET-Project** ([IndustriAgents/PROFINET-MCP](https://github.com/IndustriAgents/PROFINET-MCP)) – PROFINET IO devices, modules, and diagnostics
+- **S7comm-Project** ([IndustriAgents/S7comm-MCP](https://github.com/IndustriAgents/S7comm-MCP)) – Siemens S7 PLCs via S7comm
 
 For each:
 
 - A Python MCP server wraps the relevant client libraries
 - A mock device/server provides a safe playground
-- A roadmap document under `docs/roadmap/` (referenced from each README) outlines phased implementation
+- A README in the protocol's repository covers its tools, configuration and implementation status
 
 ---
 
@@ -287,8 +287,9 @@ As of now:
 - All major protocol projects are structured with:
   - A Python MCP server
   - A mock device/server
-  - A documented roadmap and quickstart README
-- Node/TypeScript MCP implementations that previously existed have been removed in favor of a simpler Python‑first story and more consistent maintenance.
+  - A quickstart README
+- Each protocol project is developed in its own repository and pinned into IndustriConnect as a git submodule.
+- Node/TypeScript MCP implementations that previously existed have been removed in favor of a simpler Python‑first story and more consistent maintenance. The exception is OPC UA's Node runtime, which serves the same tool contract as its Python server.
 
 Next steps and ongoing work typically include:
 
@@ -297,7 +298,7 @@ Next steps and ongoing work typically include:
 - Adding more realistic scenarios to mock servers (faults, alarms, degraded modes)
 - Tightening security (TLS, authentication, fine‑grained write permissions)
 
-Refer to each protocol project’s `docs/roadmap/…` for specific milestones and design notes.
+Refer to each protocol repository’s README and issue tracker for specific milestones and design notes.
 
 ---
 
@@ -311,7 +312,7 @@ Use this document as:
 
 For concrete commands, configuration snippets, and code‑level details, always pair this with:
 
-- The root `README.md` in `IndustriConnect-MCPs/`
-- The `README.md` files inside each protocol project
-- Any roadmap documents linked from those READMEs
+- The root `README.md` of the [IndustriConnect](https://github.com/IndustriAgents/IndustriConnect) repository
+- The `README.md` files inside each protocol project, also shown on its repository
+- The issue tracker of each protocol repository for planned work, and for OPC UA its [ROADMAP.md](https://github.com/IndustriAgents/OPCUA-MCP/blob/main/ROADMAP.md)
 
