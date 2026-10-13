@@ -1,0 +1,43 @@
+name: Suite UI checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: suite-ui-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            mcp-manager-ui/package-lock.json
+            mcp-manager-ui/mcp-backend/package-lock.json
+      - name: Install backend dependencies
+        working-directory: mcp-manager-ui/mcp-backend
+        run: npm ci --no-audit --no-fund
+      - name: Check application result handling
+        working-directory: mcp-manager-ui/mcp-backend
+        run: npm test
+      - name: Build backend
+        working-directory: mcp-manager-ui/mcp-backend
+        run: npm run build
+      - name: Install frontend dependencies
+        working-directory: mcp-manager-ui
+        run: npm ci --no-audit --no-fund
+      - name: Build frontend
+        working-directory: mcp-manager-ui
+        run: npm run build
