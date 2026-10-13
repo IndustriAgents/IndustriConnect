@@ -36,7 +36,7 @@ This repository holds what the servers share:
 - the submodule pins: `.gitmodules` and the commit each `*-Project/` folder
   points at
 
-You will rarely need to move a pin by hand. Every night the
+You will rarely need to move a pin by hand. Every hour the
 [Sync protocol submodules](.github/workflows/sync-submodules.yml) workflow
 opens or updates a single pull request on `auto/bump-submodules` that moves
 every pin that has fallen behind, and a protocol repository that sends a
@@ -193,7 +193,7 @@ jobs:
           GH_TOKEN: ${{ secrets.INDUSTRICONNECT_DISPATCH_TOKEN }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "::notice::No INDUSTRICONNECT_DISPATCH_TOKEN secret, so IndustriConnect picks this commit up in its nightly sync."
+            echo "::notice::No INDUSTRICONNECT_DISPATCH_TOKEN secret, so IndustriConnect picks this commit up in its hourly sync."
             exit 0
           fi
           gh api repos/IndustriAgents/IndustriConnect/dispatches \
@@ -205,7 +205,7 @@ jobs:
 The workflow needs an `INDUSTRICONNECT_DISPATCH_TOKEN` Actions secret in the
 new repository, holding a token that may write Contents on IndustriConnect,
 the permission a repository dispatch needs. Without the secret it only leaves
-a notice, and the new protocol is picked up by the nightly run. Then add the
+a notice, and the new protocol is picked up by the hourly run. Then add the
 repository here as a submodule:
 
 ```bash
