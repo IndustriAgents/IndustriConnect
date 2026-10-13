@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { MCPServerConfig, MCPTool } from './types.js';
+import { normalizeToolResult } from './tool-result.js';
 
 interface MCPServerInstance {
     id: string;
@@ -144,7 +145,7 @@ export class MCPServerManager {
             });
 
             console.log(`[MCP Manager] Tool result:`, result);
-            return result;
+            return normalizeToolResult(result);
         } catch (error) {
             console.error(`[MCP Manager] Tool call failed:`, error);
             throw error;

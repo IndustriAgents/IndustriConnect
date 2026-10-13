@@ -102,7 +102,7 @@ High‑level summary of each protocol project, with the repository it is develop
   - **modbus-mock-server** – Mock Modbus TCP device with a realistic register map
 - `MQTT-Project/` — git submodule tracking [IndustriAgents/MQTT-MCP](https://github.com/IndustriAgents/MQTT-MCP)
   - **mqtt-python** – MQTT + Sparkplug B MCP server (publish, subscribe, Sparkplug lifecycle)
-  - **mqtt-mock-server** – Mock MQTT broker + Sparkplug edge nodes
+  - **mqtt-mock-server** – Sparkplug edge nodes; requires a separate MQTT broker such as Mosquitto
 - `OPCUA-Project/` — git submodule tracking [IndustriAgents/OPCUA-MCP](https://github.com/IndustriAgents/OPCUA-MCP)
   - **packages/server-python** – OPC UA MCP server (read/write nodes, browse, methods, bulk operations)
   - **packages/server-node** – the same tool contract on Node, published to npm
@@ -118,13 +118,13 @@ High‑level summary of each protocol project, with the repository it is develop
   - **ethercat-mock-slave** – Mock EtherCAT slave for local smoke tests
 - `EtherNetIP-Project/` — git submodule tracking [IndustriAgents/EtherNetIP-MCP](https://github.com/IndustriAgents/EtherNetIP-MCP)
   - **ethernetip-python** – EtherNet/IP MCP server (Rockwell/AB controllers)
-  - **ethernetip-mock-server** – Mock CIP server with representative tags/UDTs
+  - **ethernetip-mock-server** – JSON bridge with representative tags/UDTs; enable `ENIP_JSON_BRIDGE` for this mock
 - `PROFIBUS-Project/` — git submodule tracking [IndustriAgents/PROFIBUS-MCP](https://github.com/IndustriAgents/PROFIBUS-MCP)
-  - **profibus-python** – PROFIBUS DP/PA MCP server
-  - **profibus-mock-slave** – Mock PROFIBUS slave
+  - **profibus-python** – Mock backend and GSD parsing; real DP master is not implemented
+  - **profibus-mock-slave** – TCP mock; use `PROFIBUS_BACKEND=mock`
 - `PROFINET-Project/` — git submodule tracking [IndustriAgents/PROFINET-MCP](https://github.com/IndustriAgents/PROFINET-MCP)
-  - **profinet-python** – PROFINET MCP server
-  - **profinet-mock-server** – Mock PROFINET IO device
+  - **profinet-python** – Network DCP discovery and GSDML parsing; I/O and configuration use the mock backend
+  - **profinet-mock-server** – JSON mock IO device; use `PROFINET_BACKEND=mock`
 - `S7comm-Project/` — git submodule tracking [IndustriAgents/S7comm-MCP](https://github.com/IndustriAgents/S7comm-MCP)
   - **s7comm-python** – Siemens S7 (S7comm) MCP server using `python-snap7`
   - **s7comm-mock-server** – Mock Siemens PLC for DB/I/O/SZL testing
@@ -135,6 +135,11 @@ High‑level summary of each protocol project, with the repository it is develop
     - Inspecting tool schemas and responses
 
 For details and protocol‑specific examples, open the `README.md` in each project directory, or on the project's repository.
+
+Modbus, MQTT, BACnet, DNP3, EtherCAT, EtherNet/IP, PROFIBUS, PROFINET and S7
+writes are disabled by default. Enable their documented switches through the
+process environment or an explicit `--env-file`; automatic project `.env`
+loading does not enable write gates. Keep the defaults for read-only use.
 
 ---
 
