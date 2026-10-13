@@ -44,11 +44,23 @@ IndustriConnect/
 Every `*-Project/` folder is a git submodule, so it stays empty until you
 initialise it. The cloning note under
 [Quick Start](#quick-start-example-modbus) explains how. Each submodule tracks
-the `main` branch of its repository. Every night the
+the `main` branch of its repository. Every hour the
 [Sync protocol submodules](.github/workflows/sync-submodules.yml) workflow
 opens or updates one pull request that moves the pins forward. A protocol
 repository that sends a `protocol-mcp-updated` dispatch when its `main` moves
 gets picked up straight away.
+
+Updates reach the suite after that pull request is merged. To refresh an
+existing local checkout, run these commands from the suite's `main` branch:
+
+```bash
+git pull --ff-only
+git submodule update --init --recursive
+```
+
+Separate development checkouts, such as those under `Connect-MCPs/`, do not
+share working files with these submodules. Commit and merge protocol changes
+into their own repository's `main` branch before the sync can pick them up.
 
 Each protocol repository has:
 
