@@ -34,13 +34,17 @@ A modern, intuitive chat interface for working with local and third‑party lang
 Start both the frontend UI and the backend service with a single command:
 
 ```bash
-npm run dev
+PORT=3003 npm run dev
 ```
 
 This will start:
-- Frontend UI at http://localhost:5173 (or similar)
-- Backend WebSocket server at ws://localhost:3003
-- Backend HTTP server at http://localhost:3002
+- Frontend UI at http://localhost:3000
+- `mcp-backend`, serving HTTP and WebSocket on one port, at http://localhost:3003
+
+Keep `PORT=3003`: the UI looks for the backend at `ws://localhost:3003`.
+Without it the backend listens on its default port, 3000, which the UI itself
+uses, and **Connect** fails. In PowerShell, run `$env:PORT=3003; npm run dev`
+instead.
 
 ## Features
 
@@ -56,10 +60,13 @@ This will start:
    - Option 1: Use the form to add servers manually
    - Option 2: Import a Cursor-style JSON configuration file
    - Option 3: Use JSON editor mode to paste configuration directly
-   - Example configuration available in `mcp-config-example.json`
+   - Example configuration available in `mcp-config-example.json`. Replace
+     `/absolute/path/to/IndustriConnect` with the path to your clone of the
+     IndustriConnect repository, cloned with `--recurse-submodules` so the
+     protocol folders are populated
 
 2. **Connect to MCP Servers**
-   - Start your MCP server processes externally (e.g., run the MQTT or OPC UA servers)
+   - Keep the backend running (`PORT=3003 npm run dev` starts it). It launches each configured server over stdio when you connect, so you do not start the servers yourself
    - In the sidebar, click "Connect" next to each configured server
    - View available tools by expanding the server entry
    - Connected servers will show a green indicator
@@ -92,7 +99,7 @@ This will start:
 ## Project Structure
 
 ```
-ui/
+mcp-manager-ui/
 ├── src/
 │   ├── components/        # React components
 │   │   ├── Sidebar.tsx    # Left sidebar with sessions and theme toggle

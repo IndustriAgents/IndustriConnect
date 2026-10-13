@@ -7,7 +7,7 @@ Requirements:
     pip install matplotlib numpy graphviz pillow
 
 Usage:
-    python generate_whitepaper_figures.py
+    python generate_figures.py
 """
 
 import matplotlib.pyplot as plt
@@ -17,8 +17,8 @@ import numpy as np
 from matplotlib.lines import Line2D
 import os
 
-# Set up output directory
-OUTPUT_DIR = "/Users/mx/Documents/Work/industriAgents/IndustriConnect-MCPs/whitepaper/figures"
+# Write the figures next to this script, wherever the repository is cloned
+OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Professional color scheme

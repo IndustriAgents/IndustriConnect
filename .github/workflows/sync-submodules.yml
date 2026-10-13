@@ -1,0 +1,326 @@
+name: Sync protocol submodules
+
+# Keeps every submodule listed in .gitmodules pinned to the latest main of its
+# own repository (IndustriAgents/<Protocol>-MCP). Runs nightly and on manual
+# dispatch. A protocol repository can also start a run as soon as its main
+# moves, by sending this repository_dispatch from a notify workflow that holds
+# an INDUSTRICONNECT_DISPATCH_TOKEN secret (CONTRIBUTING.md has one to copy):
+#
+#   event_type: protocol-mcp-updated   client_payload: { repo, sha }
+#
+# A repository without that workflow and secret is picked up by the nightly
+# run only. opcua-mcp-updated is the event the OPC UA-only workflow this one
+# replaced listened for; it is still accepted so that a sender written for
+# that workflow keeps working, but new senders use protocol-mcp-updated.
+#
+# Every run pulls *all* submodules, so the payload only tells us who knocked;
+# it is logged, never trusted. All moved submodules land in one PR on
+# auto/bump-submodules, which is opened once and updated in place afterwards.
+# Once main already has every pin the PR proposes, the next run deletes the
+# branch, which closes the PR.
+#
+# Two things have to be in place before this can work:
+#
+# - Every repository in .gitmodules is public and has a main branch. The
+#   checkout clones submodules with this repository's GITHUB_TOKEN, which
+#   cannot read other private repositories, and one submodule it cannot clone
+#   fails the whole run, so no pin moves at all. main need not be the default
+#   branch: the run fetches the branch .gitmodules names for each submodule.
+# - Something is allowed to open the PR. Either an organisation owner turns on
+#   "Allow GitHub Actions to create and approve pull requests" (Settings >
+#   Actions > General > Workflow permissions), first for the organisation and
+#   then for this repository, or a GitHub App installed on this repository
+#   with read and write access to Contents, Pull requests and Issues provides
+#   the token: its client ID in the SYNC_APP_CLIENT_ID variable and its
+#   private key in the SYNC_APP_PRIVATE_KEY secret. Without either, every run
+#   that moves a pin fails at the PR step with "GitHub Actions is not
+#   permitted to create or approve pull requests". A PR opened with the App's
+#   token also triggers pull_request workflows, which one opened with
+#   GITHUB_TOKEN does not.
+#
+# Once either is set up, start the workflow by hand (workflow_dispatch) and
+# check that it opens the PR before relying on the nightly run.
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+  repository_dispatch:
+    types: [protocol-mcp-updated, opcua-mcp-updated]
+
+permissions:
+  contents: write
+  pull-requests: write
+  # The PR gets the labels "automated" and "submodule", which already exist in
+  # this repository. If they are ever deleted, applying them recreates them,
+  # which needs "issues: write" here.
+
+# Nine protocol repos merging at about the same time send nine dispatches. Run
+# them one at a time so they never push to auto/bump-submodules concurrently.
+# A queued run replaces any older queued one, which loses nothing: whichever
+# run goes next pulls the latest main of every submodule anyway. In-progress
+# runs are left to finish rather than being cancelled halfway through a push.
+concurrency:
+  group: sync-submodules
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Always main, also when a manual run is started from another branch:
+      # the PR targets main, and its branch is shared by every run.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          submodules: true
+
+      - name: Pull the latest main of every submodule
+        id: bump
+        env:
+          # Passed through env, not ${{ }} in the script, so a payload can
+          # never be executed as shell.
+          DISPATCH_REPO: ${{ github.event.client_payload.repo }}
+          DISPATCH_SHA: ${{ github.event.client_payload.sha }}
+        run: |
+          set -euo pipefail
+
+          # The payload is printed with its control characters removed, so a
+          # newline in it cannot start a line that the runner would read as a
+          # workflow command (::error::, ::add-mask::, ::stop-commands::).
+          if [ -n "${DISPATCH_REPO:-}" ]; then
+            printf 'Dispatched by %s at %s\n' \
+              "$(printf '%s' "$DISPATCH_REPO" | tr -d '[:cntrl:]')" \
+              "$(printf '%s' "${DISPATCH_SHA:-an unspecified commit}" | tr -d '[:cntrl:]')"
+          fi
+
+          # The checkout cloned each submodule one commit deep, and a clone
+          # like that fetches only the default branch of its repository. Have
+          # each submodule also fetch the branch .gitmodules names for it, so
+          # that --remote finds origin/main even where main is not the default
+          # branch. A submodule without a branch line follows the default
+          # branch, which the clone already fetches. The quoted script is
+          # expanded by foreach, in each submodule, which sets $name and
+          # $toplevel.
+          # shellcheck disable=SC2016
+          git submodule foreach --quiet '
+            branch=$(git config -f "$toplevel/.gitmodules" "submodule.$name.branch" || true)
+            if [ "$branch" = . ]; then branch=$(git -C "$toplevel" symbolic-ref --short HEAD); fi
+            if [ -n "$branch" ]; then
+              git config --add remote.origin.fetch "+refs/heads/$branch:refs/remotes/origin/$branch"
+            fi
+          '
+
+          git submodule update --remote --init
+
+          # Sets $web (https://host/owner/repo) and $slug (owner/repo) from a
+          # submodule URL in any form git accepts: https://host/owner/repo(.git),
+          # git@host:owner/repo(.git), ssh://git@host[:port]/owner/repo(.git),
+          # or ../repo(.git) relative to this repository.
+          parse_url() {
+            local url=$1 base rest host
+            case $url in
+              ./*|../*)
+                base="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+                while :; do
+                  case $url in
+                    ./*) url=${url#./} ;;
+                    ../*) url=${url#../}; base=${base%/*} ;;
+                    *) break ;;
+                  esac
+                done
+                url="${base}/${url}"
+                ;;
+            esac
+            url=${url%/}
+            url=${url%.git}
+            case $url in
+              http://*|https://*) rest=${url#*://}; rest=${rest#*@}; host=${rest%%/*}; rest=${rest#*/} ;;
+              *://*) rest=${url#*://}; rest=${rest#*@}; host=${rest%%/*}; host=${host%%:*}; rest=${rest#*/} ;;
+              *:*) rest=${url#*@}; host=${rest%%:*}; rest=${rest#*:} ;;
+              *) return 1 ;;
+            esac
+            case $rest in
+              ?*/?*) ;;
+              *) return 1 ;;
+            esac
+            web="https://${host}/${rest}"
+            slug=$rest
+          }
+
+          # Writes a value to $GITHUB_OUTPUT with a random heredoc delimiter, so
+          # an upstream commit subject can neither end the value early nor smuggle
+          # in another output.
+          put_output() {
+            local delim
+            delim="ghadelimiter_$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')"
+            case $2 in
+              *"$delim"*) echo "::error::output '$1' contains its own delimiter"; exit 1 ;;
+            esac
+            {
+              printf '%s<<%s\n' "$1" "$delim"
+              printf '%s\n' "$2"
+              printf '%s\n' "$delim"
+            } >> "$GITHUB_OUTPUT"
+          }
+
+          # Prints $1 as a Markdown code span. The PR body shows each upstream
+          # subject this way, so GitHub neither turns its issue references into
+          # cross-references (a backlink on the upstream issue, or closing it
+          # through a keyword such as "fixes"), nor notifies its @mentions, nor
+          # renders its markup. The fence is one backtick longer than any run
+          # of backticks inside the text.
+          code_span() {
+            local fence='`'
+            while [[ $1 == *"$fence"* ]]; do fence+='`'; done
+            printf '%s %s %s' "$fence" "$1" "$fence"
+          }
+
+          entries=$(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' || true)
+
+          count=0
+          rewinds=0
+          title_items=""
+          title_paths=""
+          rewind_paths=""
+          body_lines=""
+          commit_lines=""
+          nl=$'\n'
+
+          while read -r key path; do
+            [ -n "$key" ] || continue
+            name=${key#submodule.}
+            name=${name%.path}
+
+            # git submodule update skips a .gitmodules entry that has no
+            # gitlink in the tree (say, a folder removed without its entry),
+            # so skip it here too rather than failing every other pin with it.
+            if [ "$(git ls-tree HEAD -- "$path" | cut -d' ' -f1)" != 160000 ]; then
+              echo "::warning::${path}: listed in .gitmodules but not a submodule in HEAD; skipping. Remove the stale entry."
+              continue
+            fi
+
+            old=$(git rev-parse "HEAD:${path}")
+            new=$(git -C "$path" rev-parse HEAD)
+            if [ "$old" = "$new" ]; then
+              echo "${path}: already at the latest main (${new:0:7})"
+              continue
+            fi
+
+            url=$(git config -f .gitmodules --get "submodule.${name}.url")
+            if ! parse_url "$url"; then
+              echo "::error::${path}: cannot derive owner/repo from submodule URL '${url}'"
+              exit 1
+            fi
+
+            short=$(git -C "$path" rev-parse --short HEAD)
+            subject=$(git -C "$path" log -1 --format=%s HEAD | tr -d '\r')
+            # A bare "#123" in an upstream subject means an issue in that repo,
+            # not in this one, so qualify it, or readers of the PR could not
+            # tell. The subject appears only in the PR body, as a code span.
+            # It stays out of the commit message: once the bump is merged
+            # into main, GitHub would act on the references there, adding a
+            # "referenced" event to each upstream issue and, after a closing
+            # keyword ("fixes owner/repo#12"), closing it again if it had been
+            # reopened.
+            subject=$(printf '%s\n' "$subject" | sed -E "s,(^|[^[:alnum:]_./&-])#([0-9]+),\1${slug}#\2,g")
+
+            count=$((count + 1))
+            title_items="${title_items:+${title_items}, }${path}@${short}"
+            title_paths="${title_paths:+${title_paths}, }${path}"
+            line="- \`${path}\` → [${slug}@${short}](${web}/commit/${new}): $(code_span "$subject")"
+
+            # A pin should only move forward along main. When the old pin is
+            # not in the history of the new head, main was rewritten (say,
+            # force-pushed back) or the pin was set on purpose to a commit that
+            # is not on main, such as a hotfix. Moving it would drop commits,
+            # so flag it for the reviewer instead of calling it a bump. The
+            # checkout cloned each submodule one commit deep, which leaves the
+            # new head without parents, so fetch its history first.
+            if [ "$(git -C "$path" rev-parse --is-shallow-repository)" = true ]; then
+              git -C "$path" fetch --quiet --unshallow origin
+            fi
+            if git -C "$path" merge-base --is-ancestor "$old" "$new"; then
+              echo "${path}: ${old:0:7} -> ${short} (${slug})"
+              body_lines+="${line} ([diff](${web}/compare/${old}...${new}))${nl}"
+              commit_lines+="${path} → ${slug}@${short}${nl}"
+            else
+              echo "::warning::${path}: ${old:0:7} -> ${short} (${slug}) is not a fast-forward; ${old:0:7} is not in the history of the new main"
+              rewinds=$((rewinds + 1))
+              rewind_paths="${rewind_paths:+${rewind_paths}, }${path}"
+              body_lines+="${line} (**not a fast-forward** from \`${old:0:7}\`; [commits this drops](${web}/compare/${new}...${old}))${nl}"
+              commit_lines+="${path} → ${slug}@${short}, not a fast-forward from ${old:0:7}${nl}"
+            fi
+          done <<< "$entries"
+
+          if [ "$count" -eq 0 ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Every submodule is already at the latest main." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # GitHub caps PR titles at 256 characters; degrade rather than
+          # truncate, and keep the not-a-fast-forward warning in every form.
+          warn=""
+          if [ "$rewinds" -gt 0 ]; then
+            warn=" (not a fast-forward: ${rewind_paths})"
+          fi
+          if [ "$count" -eq 1 ] && [ "$rewinds" -eq 0 ]; then
+            title="chore: bump ${title_items/@/ to }"
+          elif [ "$count" -eq 1 ]; then
+            title="chore: move ${title_items/@/ to } (not a fast-forward)"
+          else
+            title="chore: bump ${count} submodules${warn}: ${title_items}"
+          fi
+          if [ "${#title}" -gt 256 ]; then
+            title="chore: bump ${count} submodules${warn}: ${title_paths}"
+          fi
+          if [ "${#title}" -gt 256 ]; then
+            title="chore: bump ${count} submodules${warn}"
+          fi
+          if [ "${#title}" -gt 256 ]; then
+            title="chore: bump ${count} submodules (${rewinds} not a fast-forward)"
+          fi
+
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          body="Automated bump to the latest \`main\` of each moved submodule:${nl}${nl}${body_lines}${nl}"
+          if [ "$rewinds" -gt 0 ]; then
+            body+="> [!WARNING]${nl}"
+            body+="> A pin marked *not a fast-forward* moves to a commit whose history does not contain the current pin."
+            body+=" Either \`main\` was rewritten upstream, or the pin was set on purpose to a commit that is not on \`main\`."
+            body+=" Merging drops the commits linked from that line, so check them first.${nl}${nl}"
+          fi
+          body+="Opened by [${GITHUB_WORKFLOW}](${run_url}) on \`${GITHUB_EVENT_NAME}\`."
+          body+=" Each line names the new head commit; *diff* shows everything since the previous pin."
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          put_output title "$title"
+          put_output body "$body"
+          put_output commit_message "${title}${nl}${nl}${commit_lines%"${nl}"}"
+          printf '%s\n' "$body" >> "$GITHUB_STEP_SUMMARY"
+
+      # Only used when the App described at the top of this file is set up;
+      # otherwise the PR is opened with GITHUB_TOKEN.
+      - name: Get a GitHub App token
+        id: app-token
+        if: vars.SYNC_APP_CLIENT_ID != ''
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+
+      # Also runs when nothing moved. create-pull-request then finds no
+      # difference from main and, because of delete-branch, deletes
+      # auto/bump-submodules if it exists, which closes a PR whose pins have
+      # meanwhile been moved on main by hand. With no branch it does nothing.
+      - name: Open, update or close the bump PR
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ steps.app-token.outputs.token || github.token }}
+          base: main
+          branch: auto/bump-submodules
+          commit-message: ${{ steps.bump.outputs.commit_message }}
+          title: ${{ steps.bump.outputs.title }}
+          body: ${{ steps.bump.outputs.body }}
+          labels: automated, submodule
+          delete-branch: true

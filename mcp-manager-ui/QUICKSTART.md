@@ -3,17 +3,24 @@
 ## Installation
 
 ```bash
-cd ui
+cd mcp-manager-ui
 npm install
+cd mcp-backend && npm install && cd ..
 ```
 
 ## Running the Application
 
 ```bash
-npm run dev
+PORT=3003 npm run dev
 ```
 
 The application will automatically open in your browser at `http://localhost:3000`.
+
+The same command starts `mcp-backend`, which launches MCP servers when you click
+**Connect**. Keep `PORT=3003`: the UI looks for the backend at
+`ws://localhost:3003`. Without it the backend takes its default port, 3000,
+which the UI already uses, and **Connect** fails. In PowerShell, run
+`$env:PORT=3003; npm run dev` instead.
 
 ## First Steps
 
@@ -57,7 +64,7 @@ The application will automatically open in your browser at `http://localhost:300
 
 **Application won't start:**
 - Ensure Node.js 18+ is installed: `node --version`
-- Delete `node_modules` and reinstall: `rm -rf node_modules && npm install`
+- Delete `node_modules` and reinstall: `rm -rf node_modules mcp-backend/node_modules && npm install && (cd mcp-backend && npm install)`
 
 **Theme not working:**
 - Clear browser cache and reload

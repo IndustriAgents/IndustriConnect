@@ -1,5 +1,38 @@
 blank_issues_enabled: false
 contact_links:
+  # Each protocol server and its mock are developed in their own repository,
+  # so bugs and feature requests for one of them are filed there.
+  # The templates in this folder cover mcp-manager-ui and suite-wide issues.
+  - name: BACnet server or mock
+    url: https://github.com/IndustriAgents/BACnet-MCP/issues/new/choose
+    about: Bugs and feature requests for the BACnet/IP MCP server or its mock go to IndustriAgents/BACnet-MCP.
+  - name: DNP3 server or mock
+    url: https://github.com/IndustriAgents/DNP3-MCP/issues/new/choose
+    about: Bugs and feature requests for the DNP3 MCP server or its mock go to IndustriAgents/DNP3-MCP.
+  - name: EtherCAT server or mock
+    url: https://github.com/IndustriAgents/EtherCAT-MCP/issues/new/choose
+    about: Bugs and feature requests for the EtherCAT MCP server or its mock go to IndustriAgents/EtherCAT-MCP.
+  - name: EtherNet/IP server or mock
+    url: https://github.com/IndustriAgents/EtherNetIP-MCP/issues/new/choose
+    about: Bugs and feature requests for the EtherNet/IP MCP server or its mock go to IndustriAgents/EtherNetIP-MCP.
+  - name: Modbus server or mock
+    url: https://github.com/IndustriAgents/MODBUS-MCP/issues/new/choose
+    about: Bugs and feature requests for the Modbus MCP server or its mock go to IndustriAgents/MODBUS-MCP.
+  - name: MQTT / Sparkplug B server or mock
+    url: https://github.com/IndustriAgents/MQTT-MCP/issues/new/choose
+    about: Bugs and feature requests for the MQTT and Sparkplug B MCP server or its mock go to IndustriAgents/MQTT-MCP.
+  - name: OPC UA server or mock
+    url: https://github.com/IndustriAgents/OPCUA-MCP/issues/new/choose
+    about: Bugs and feature requests for the OPC UA MCP server or its mock go to IndustriAgents/OPCUA-MCP.
+  - name: PROFIBUS server or mock
+    url: https://github.com/IndustriAgents/PROFIBUS-MCP/issues/new/choose
+    about: Bugs and feature requests for the PROFIBUS DP/PA MCP server or its mock go to IndustriAgents/PROFIBUS-MCP.
+  - name: PROFINET server or mock
+    url: https://github.com/IndustriAgents/PROFINET-MCP/issues/new/choose
+    about: Bugs and feature requests for the PROFINET MCP server or its mock go to IndustriAgents/PROFINET-MCP.
+  - name: S7comm server or mock
+    url: https://github.com/IndustriAgents/S7comm-MCP/issues/new/choose
+    about: Bugs and feature requests for the Siemens S7 (S7comm) MCP server or its mock go to IndustriAgents/S7comm-MCP.
   - name: Question or usage help
     url: https://github.com/IndustriAgents/IndustriConnect/discussions
     about: Ask about configuration, MCP clients, or connecting to your own equipment.

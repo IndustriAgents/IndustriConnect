@@ -139,7 +139,7 @@ Illustrates how multiple AI agents collaborate to handle complex industrial oper
 To regenerate all figures:
 
 ```bash
-cd /Users/mx/Documents/Work/industriAgents/IndustriConnect-MCPs/whitepaper/figures
+cd whitepaper/figures   # from the root of your clone
 python3 generate_figures.py
 ```
 

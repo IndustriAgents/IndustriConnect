@@ -1,27 +1,26 @@
+<!--
+Changes to a protocol server or its mock go to that protocol's own repository
+(see CONTRIBUTING.md). Its pin here moves through the automated
+auto/bump-submodules pull request once the change is merged there.
+-->
+
 ## Summary
 
 <!-- What does this PR do, and why? -->
 
-## Protocol project(s) affected
+## What does it touch?
 
-- [ ] BACnet
-- [ ] DNP3
-- [ ] EtherCAT
-- [ ] EtherNet/IP
-- [ ] Modbus
-- [ ] MQTT / Sparkplug B
-- [ ] OPC UA
-- [ ] PROFIBUS
-- [ ] PROFINET
-- [ ] S7comm
 - [ ] mcp-manager-ui
-- [ ] Docs / CI only
+- [ ] Docs / whitepaper
+- [ ] Submodule pin(s) — which:
+- [ ] CI / repository configuration
 
 ## Type of change
 
 - [ ] Bug fix
-- [ ] New tool
-- [ ] New protocol project
+- [ ] New feature
+- [ ] New protocol (adds a submodule)
+- [ ] Submodule bump
 - [ ] Documentation
 - [ ] Refactor / chore
 
@@ -32,12 +31,10 @@
 
 ## Checklist
 
-- [ ] Tools still return the shared `{ success, data, error, meta }` envelope.
-- [ ] The mock device can exercise the change, and I tested against it.
 - [ ] Nothing was tested against production equipment.
-- [ ] `stdout` is still clean — all logging goes to `stderr`.
-- [ ] I updated the project README where relevant.
+- [ ] For a pin moved by hand: the server starts and answers against its mock at the new commit.
+- [ ] I updated the README or docs where relevant.
 
 ## How to test
 
-<!-- The exact commands and tool calls a reviewer can run against the mock. -->
+<!-- The exact commands and steps a reviewer can run, against the mocks. -->

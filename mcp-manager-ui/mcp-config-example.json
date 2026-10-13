@@ -4,7 +4,7 @@
       "command": "uv",
       "args": [
         "--directory",
-        "${PROJECT_ROOT}/MQTT-Project/mqtt-python",
+        "/absolute/path/to/IndustriConnect/MQTT-Project/mqtt-python",
         "run",
         "mqtt-mcp"
       ],
@@ -19,9 +19,9 @@
       "command": "uv",
       "args": [
         "--directory",
-        "${PROJECT_ROOT}/OPCUA-Project/opcua-mcp-server",
+        "/absolute/path/to/IndustriConnect/OPCUA-Project/packages/server-python",
         "run",
-        "opcua-mcp-server.py"
+        "opcua-mcp-server"
       ],
       "env": {
         "OPCUA_SERVER_URL": "opc.tcp://localhost:4840"

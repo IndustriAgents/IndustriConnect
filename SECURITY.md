@@ -31,24 +31,25 @@ application on the office network.
   workstation would sit, behind whatever separates your control network from
   everything else.
 - **Never point one at a safety system.** Safety-instrumented functions are out
-  of scope for anything in this repository.
+  of scope for anything in this suite.
 
 ## Reporting a vulnerability
 
-Please report privately, through
-[GitHub private vulnerability reporting](https://github.com/IndustriAgents/IndustriConnect/security/advisories/new),
-or by email to hi@industriagents.com.
+Please report privately, by email to hi@industriagents.com. That address
+covers this repository and every protocol repository listed in
+[CONTRIBUTING.md](CONTRIBUTING.md), so you do not have to work out first where
+a problem belongs.
 
 Please do not open a public issue for a vulnerability.
 
-Include the protocol project affected, the version or commit, what an attacker
+Include the protocol repository affected, the version or commit, what an attacker
 would gain, and a reproduction if you have one. We will acknowledge within a
 week and keep you updated as we work on a fix.
 
 ## Scope
 
-In scope: the MCP servers, the mock devices, and `mcp-manager-ui` in this
-repository.
+In scope: the MCP servers and mock devices in the protocol repositories this
+suite pins as submodules, and `mcp-manager-ui` in this repository.
 
 Out of scope: vulnerabilities in the underlying protocols themselves (the lack
 of authentication in Modbus is a property of Modbus), in third-party libraries

@@ -10,6 +10,11 @@ MCP (Model Context Protocol) allows LLMs to interact with external systems throu
 
 ### 1. Configure Your MCP Servers
 
+The paths below use `/absolute/path/to/IndustriConnect` as a placeholder for
+your clone of the IndustriConnect repository. Replace it with the real path,
+here and in `mcp-config-example.json`. Clone with `--recurse-submodules`,
+because the protocol folders are git submodules (see the root `README.md`).
+
 You have three options:
 
 **Option A: Import from File**
@@ -31,7 +36,7 @@ You have three options:
    - **Arguments** (one per line):
      ```
      --directory
-     /Users/mx/Documents/IndustriConnect-MCPs/MQTT-Project/mqtt-python
+     /absolute/path/to/IndustriConnect/MQTT-Project/mqtt-python
      run
      mqtt-mcp
      ```
@@ -44,21 +49,43 @@ You have three options:
      ```
 3. Click "Add Server"
 
-### 2. Start Your MCP Servers
+### 2. Start the UI and Its Backend
 
-**Important**: This UI runs in the browser and cannot spawn server processes automatically. You must start your MCP servers manually.
-
-For MQTT MCP server:
 ```bash
-cd /Users/mx/Documents/IndustriConnect-MCPs/MQTT-Project/mqtt-python
+cd mcp-manager-ui
+npm install
+(cd mcp-backend && npm install)   # the backend has its own dependencies
+PORT=3003 npm run dev
+```
+
+The browser cannot start processes itself, so this also starts `mcp-backend`.
+When you click **Connect**, the backend launches the server over stdio with the
+command, arguments and environment from your configuration. You do not start
+the MCP servers yourself. The UI opens at http://localhost:3000.
+
+Keep `PORT=3003`: the UI looks for the backend at `ws://localhost:3003`.
+Without it the backend listens on its default port, 3000, which the UI itself
+uses, and **Connect** fails. In PowerShell, run `$env:PORT=3003; npm run dev`
+instead.
+
+Check that each command works from a terminal first. It should start and then
+wait for an MCP client on stdin. Stop it with Ctrl+C.
+
+For the MQTT MCP server:
+```bash
+cd /absolute/path/to/IndustriConnect/MQTT-Project/mqtt-python
 uv run mqtt-mcp
 ```
 
-For OPC UA MCP server:
+For the OPC UA MCP server:
 ```bash
-cd /Users/mx/Documents/IndustriConnect-MCPs/OPCUA-Project/packages/server-python
+cd /absolute/path/to/IndustriConnect/OPCUA-Project/packages/server-python
 uv run opcua-mcp-server
 ```
+
+The servers also need something to talk to. For local testing, use the mocks:
+`uv run mqtt-mock-server` in `MQTT-Project/mqtt-mock-server`, and
+`uv run opcua-mock-server` in `OPCUA-Project/packages/mock-server`.
 
 ### 3. Connect in the UI
 
@@ -79,25 +106,18 @@ Once connected, you can reference MCP capabilities in your chat:
 ✅ **Implemented:**
 - MCP server configuration UI (form & JSON)
 - Import/Export Cursor-style configuration
-- Server connection management
+- Server connection management through `mcp-backend`, which spawns each server over stdio and relays it to the browser over WebSocket
 - Tool listing and display
+- Tool calls from the LLM (OpenAI, Gemini, Anthropic and Ollama), executed on the real server
 - Persistent configuration storage
-
-⏳ **Simulated (Mock):**
-- Actual MCP server communication (currently shows mock tools)
-- Tool execution (returns mock responses)
-
-🔜 **Future Enhancements:**
-- Real MCP server communication via WebSocket/HTTP
-- Backend service to spawn and manage MCP processes
-- Actual tool execution with real results
-- Tool call integration in LLM responses
 
 ## Troubleshooting
 
 **Server won't connect:**
-- Ensure the MCP server process is running
-- Check that paths in configuration are correct
+- Ensure `mcp-backend` is running on port 3003: `curl http://localhost:3003/health`
+  should answer `{"status":"ok","service":"mcp-backend"}`. If it does not, start
+  the UI with `PORT=3003 npm run dev`, which starts the backend alongside it
+- Check that paths in configuration are correct, and that the command runs from a terminal
 - Verify environment variables are set properly
 
 **No tools showing:**

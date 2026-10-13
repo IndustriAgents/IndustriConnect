@@ -2,3 +2,39 @@
 	path = OPCUA-Project
 	url = https://github.com/IndustriAgents/OPCUA-MCP.git
 	branch = main
+[submodule "BACnet-Project"]
+	path = BACnet-Project
+	url = https://github.com/IndustriAgents/BACnet-MCP.git
+	branch = main
+[submodule "DNP3-Project"]
+	path = DNP3-Project
+	url = https://github.com/IndustriAgents/DNP3-MCP.git
+	branch = main
+[submodule "EtherCAT-Project"]
+	path = EtherCAT-Project
+	url = https://github.com/IndustriAgents/EtherCAT-MCP.git
+	branch = main
+[submodule "EtherNetIP-Project"]
+	path = EtherNetIP-Project
+	url = https://github.com/IndustriAgents/EtherNetIP-MCP.git
+	branch = main
+[submodule "MODBUS-Project"]
+	path = MODBUS-Project
+	url = https://github.com/IndustriAgents/MODBUS-MCP.git
+	branch = main
+[submodule "MQTT-Project"]
+	path = MQTT-Project
+	url = https://github.com/IndustriAgents/MQTT-MCP.git
+	branch = main
+[submodule "PROFIBUS-Project"]
+	path = PROFIBUS-Project
+	url = https://github.com/IndustriAgents/PROFIBUS-MCP.git
+	branch = main
+[submodule "PROFINET-Project"]
+	path = PROFINET-Project
+	url = https://github.com/IndustriAgents/PROFINET-MCP.git
+	branch = main
+[submodule "S7comm-Project"]
+	path = S7comm-Project
+	url = https://github.com/IndustriAgents/S7comm-MCP.git
+	branch = main

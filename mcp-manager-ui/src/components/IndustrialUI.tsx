@@ -198,7 +198,7 @@ export default function IndustrialUI({
           </button>
           <a
             className="sb-foot-link"
-            href="https://github.com/yashika-sharma/IndustriConnect-MCPs"
+            href="https://github.com/IndustriAgents/IndustriConnect#readme"
             target="_blank"
             rel="noreferrer noopener"
           >
