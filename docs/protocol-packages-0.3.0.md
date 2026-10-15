@@ -59,3 +59,32 @@ checks in GitHub Actions.
 No physical-device acceptance test is implied. PROFIBUS live DP remains
 unimplemented; PROFINET live support remains DCP discovery. See each protocol's
 capability limits before selecting a live backend.
+
+## Publishing the tagged packages
+
+All nine repositories have an immutable `v0.3.0` source tag. Publication setup
+is per registry and per package; the package/repository mapping is in the table
+above. Use the workflow on the repository's current `main` branch for retries:
+
+```sh
+gh workflow run release.yml --repo IndustriAgents/MODBUS-MCP --ref main -f release_tag=v0.3.0
+```
+
+This checks out the existing tag, validates its version, tests and packages it,
+then publishes those artifacts. A manual run without `release_tag` only builds.
+Publication workflow fixes are on `main`; the source tags and suite pins stay
+unchanged.
+
+For each PyPI package, configure a pending trusted publisher with owner
+`IndustriAgents`, the repository name in the table, workflow `release.yml`, and
+environment `pypi`. For npm, an authenticated maintainer must first publish the
+new package if it does not yet exist, then configure its trusted publisher for
+the same owner/repository/workflow and environment `npm`. The first publication
+can use the verified npm tarball from the GitHub run's `packages` artifact.
+
+Registry access was unavailable during the 2026-10-15 release attempt: PyPI
+reported `invalid-publisher`, local npm authentication returned HTTP 401, and
+all eighteen registry version endpoints returned HTTP 404. These observations
+are a dated publication-status snapshot, not package test failures. Check the
+latest publishing run and registry endpoint before retrying; if one registry
+already has 0.3.0, rerun only the other failed publishing job.
