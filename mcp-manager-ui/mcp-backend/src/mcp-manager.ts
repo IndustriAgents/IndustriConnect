@@ -8,7 +8,6 @@ interface MCPServerInstance {
     name: string;
     config: MCPServerConfig;
     client: Client;
-    transport: StdioClientTransport;
     tools: MCPTool[];
     status: 'connecting' | 'connected' | 'error' | 'disconnected';
     error?: string;
@@ -25,76 +24,94 @@ export class MCPServerManager {
         serverName: string,
         config: MCPServerConfig
     ): Promise<{ success: boolean; error?: string; tools?: MCPTool[] }> {
+        console.log(`[MCP Manager] Spawning server ${serverName} (${serverId})`);
+        console.log(`[MCP Manager] Command: ${config.command} ${config.args.join(' ')}`);
+
+        // StdioClientTransport handles spawning the process
+        const transport = new StdioClientTransport({
+            command: config.command,
+            args: config.args,
+            env: { ...process.env, ...config.env } as Record<string, string>, // Merge with current env
+            stderr: 'inherit', // Pipe stderr to parent stderr for debugging
+        });
+
+        // Client.connect() starts its own unawaited close when initialization
+        // fails, after which a second close returns before the process exits.
+        // Share the first close so callers can wait for the process to stop.
+        const closeTransport = transport.close.bind(transport);
+        let closing: Promise<void> | undefined;
+        transport.close = () => (closing ??= closeTransport());
+
+        const client = new Client(
+            {
+                name: 'mcp-backend-client',
+                version: '1.0.0',
+            },
+            {
+                capabilities: {},
+            }
+        );
+
+        const serverInstance: MCPServerInstance = {
+            id: serverId,
+            name: serverName,
+            config,
+            client,
+            tools: [],
+            status: 'connecting',
+        };
+
+        // Register on the client, not the transport: Client.connect() wraps the
+        // transport callbacks, and replacing them would stop the SDK from
+        // rejecting in-flight requests when the server process exits.
+        client.onerror = (error) => {
+            console.error(`[MCP Manager] Transport error for ${serverName}:`, error);
+            serverInstance.error = error instanceof Error ? error.message : String(error);
+        };
+
+        client.onclose = () => {
+            console.log(`[MCP Manager] Transport closed for ${serverName}`);
+            serverInstance.status = 'disconnected';
+            if (this.servers.get(serverId) === serverInstance) {
+                this.servers.delete(serverId);
+            }
+        };
+
         try {
-            console.log(`[MCP Manager] Spawning server ${serverName} (${serverId})`);
-            console.log(`[MCP Manager] Command: ${config.command} ${config.args.join(' ')}`);
-
-            // Create MCP client with stdio transport
-            // StdioClientTransport handles spawning the process
-            const transport = new StdioClientTransport({
-                command: config.command,
-                args: config.args,
-                env: { ...process.env, ...config.env } as Record<string, string>, // Merge with current env
-                stderr: 'inherit', // Pipe stderr to parent stderr for debugging
-            });
-
-            const client = new Client(
-                {
-                    name: 'mcp-backend-client',
-                    version: '1.0.0',
-                },
-                {
-                    capabilities: {},
-                }
-            );
-
-            // Connect to the server
             console.log(`[MCP Manager] Connecting to ${serverName}...`);
             await client.connect(transport);
 
             console.log(`[MCP Manager] Connected to ${serverName}`);
 
-            // List available tools
+            // Listing tools also caches their output schemas, which the SDK
+            // uses to validate structuredContent on later calls.
             const toolsResponse = await client.listTools();
-            const tools: MCPTool[] = toolsResponse.tools.map((tool: any) => ({
+            const tools: MCPTool[] = toolsResponse.tools.map(tool => ({
                 name: tool.name,
                 description: tool.description,
-                inputSchema: tool.inputSchema,
+                // The SDK types nested properties as plain JSON Schema objects
+                inputSchema: tool.inputSchema as MCPTool['inputSchema'],
             }));
 
             console.log(`[MCP Manager] Found ${tools.length} tools from ${serverName}`);
 
-            // Store server instance
-            // Note: We don't have direct access to the child process from StdioClientTransport in the current SDK version easily,
-            // but the transport manages it. We'll store the client and transport.
-            const serverInstance: MCPServerInstance = {
-                id: serverId,
-                name: serverName,
-                config,
-                client,
-                transport,
-                tools,
-                status: 'connected',
-            };
+            if (serverInstance.status === 'disconnected') {
+                throw new Error(`Server ${serverName} closed during startup`);
+            }
 
+            serverInstance.tools = tools;
+            serverInstance.status = 'connected';
             this.servers.set(serverId, serverInstance);
-
-            // Set up error handling if possible via transport (depends on SDK internals)
-            transport.onerror = (error) => {
-                console.error(`[MCP Manager] Transport error for ${serverName}:`, error);
-                serverInstance.status = 'error';
-                serverInstance.error = String(error);
-            };
-
-            transport.onclose = () => {
-                console.log(`[MCP Manager] Transport closed for ${serverName}`);
-                serverInstance.status = 'disconnected';
-                this.servers.delete(serverId);
-            };
 
             return { success: true, tools };
         } catch (error) {
             console.error(`[MCP Manager] Failed to spawn server ${serverName}:`, error);
+            serverInstance.status = 'error';
+            // Stop a process that started but failed initialization or discovery,
+            // waiting for any close the SDK already started
+            await transport.close().catch(closeError => {
+                console.error(`[MCP Manager] Error closing failed server ${serverName}:`, closeError);
+            });
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Unknown error',
@@ -125,7 +142,7 @@ export class MCPServerManager {
         serverId: string,
         toolName: string,
         args: Record<string, unknown>
-    ): Promise<any> {
+    ): Promise<Record<string, unknown>> {
         const server = this.servers.get(serverId);
         if (!server) {
             throw new Error(`Server ${serverId} not found`);
@@ -139,6 +156,8 @@ export class MCPServerManager {
         console.log(`[MCP Manager] Arguments:`, args);
 
         try {
+            // Rejects if the server exits mid-call or if structuredContent does
+            // not match the tool's advertised output schema.
             const result = await server.client.callTool({
                 name: toolName,
                 arguments: args,
@@ -162,11 +181,11 @@ export class MCPServerManager {
         }
 
         console.log(`[MCP Manager] Disconnecting server ${server.name}`);
+        this.servers.delete(serverId);
 
         try {
+            // Closes the transport and terminates the server process
             await server.client.close();
-            await server.transport.close();
-            this.servers.delete(serverId);
         } catch (error) {
             console.error(`[MCP Manager] Error disconnecting server:`, error);
         }
