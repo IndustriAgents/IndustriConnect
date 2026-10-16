@@ -8,6 +8,31 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 const mode = process.env.FIXTURE_MODE ?? 'normal';
 if (process.env.FIXTURE_PID_FILE) writeFileSync(process.env.FIXTURE_PID_FILE, String(process.pid));
 if (mode === 'exit-before-init') process.exit(3);
+if (mode === 'reject-init') {
+    // Answer initialize with an unsupported protocol version and stay alive,
+    // exiting slowly once stdin closes so callers must wait for termination.
+    let buffer = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', chunk => {
+        buffer += chunk;
+        let newline;
+        while ((newline = buffer.indexOf('\n')) !== -1) {
+            const message = JSON.parse(buffer.slice(0, newline));
+            buffer = buffer.slice(newline + 1);
+            if (message.method !== 'initialize') continue;
+            process.stdout.write(JSON.stringify({
+                jsonrpc: '2.0',
+                id: message.id,
+                result: {
+                    protocolVersion: '1999-01-01',
+                    capabilities: {},
+                    serverInfo: { name: 'fixture', version: '1.0.0' },
+                },
+            }) + '\n');
+        }
+    });
+    process.stdin.on('end', () => setTimeout(() => process.exit(0), 500));
+}
 
 const envelopeSchema = {
     type: 'object',
@@ -75,5 +100,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
     return handler(request.params.arguments ?? {});
 });
 
-process.stdin.on('end', () => process.exit(0));
-await server.connect(new StdioServerTransport());
+if (mode !== 'reject-init') {
+    process.stdin.on('end', () => process.exit(0));
+    await server.connect(new StdioServerTransport());
+}

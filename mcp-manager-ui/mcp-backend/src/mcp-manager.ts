@@ -35,6 +35,13 @@ export class MCPServerManager {
             stderr: 'inherit', // Pipe stderr to parent stderr for debugging
         });
 
+        // Client.connect() starts its own unawaited close when initialization
+        // fails, after which a second close returns before the process exits.
+        // Share the first close so callers can wait for the process to stop.
+        const closeTransport = transport.close.bind(transport);
+        let closing: Promise<void> | undefined;
+        transport.close = () => (closing ??= closeTransport());
+
         const client = new Client(
             {
                 name: 'mcp-backend-client',
@@ -100,8 +107,9 @@ export class MCPServerManager {
         } catch (error) {
             console.error(`[MCP Manager] Failed to spawn server ${serverName}:`, error);
             serverInstance.status = 'error';
-            // Stop a process that started but failed initialization or discovery
-            await client.close().catch(closeError => {
+            // Stop a process that started but failed initialization or discovery,
+            // waiting for any close the SDK already started
+            await transport.close().catch(closeError => {
                 console.error(`[MCP Manager] Error closing failed server ${serverName}:`, closeError);
             });
             return {

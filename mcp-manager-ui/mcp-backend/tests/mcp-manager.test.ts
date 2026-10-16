@@ -83,6 +83,16 @@ test('a server exiting before initialization reports a failed spawn', async () =
     assert.equal(manager.getServerStatus('fixture'), 'disconnected');
 });
 
+test('a rejected initialization waits for the still-running server to exit', async () => {
+    const manager = new MCPServerManager();
+    const { config, pidFile } = fixtureConfig('reject-init');
+    const spawned = await manager.spawnServer('fixture', 'Fixture', config);
+    assert.equal(spawned.success, false);
+    assert.match(spawned.error ?? '', /protocol version is not supported/);
+    assert.equal(manager.getServerStatus('fixture'), 'disconnected');
+    assert.equal(isAlive(pidFile), false);
+});
+
 test('a missing executable reports a failed spawn', async () => {
     const manager = new MCPServerManager();
     const spawned = await manager.spawnServer('fixture', 'Fixture', {
