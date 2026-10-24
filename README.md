@@ -291,3 +291,17 @@ If you use this work, please cite:
 ## License
 
 Released under the [MIT License](LICENSE).
+
+## Verify protocol implementations
+
+The [protocol architecture and build guide](docs/protocol-architecture.md)
+explains the shared execution boundaries, supported native backends, and
+verification of installed artifacts. After initializing the submodules, run:
+
+```sh
+python3 scripts/mcp_workspace.py verify
+```
+
+This checks and builds the nine Python protocol servers, validates their npm
+launchers, and tests the installed artifacts. OPC UA retains its own runtime
+and conformance workflow. Reports and logs are written under `.build/`.
