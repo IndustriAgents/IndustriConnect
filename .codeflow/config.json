@@ -1,0 +1,13 @@
+{
+  "setup": "if command -v industriconnect-setup >/dev/null 2>&1; then industriconnect-setup; else python3 \"$(git rev-parse --show-toplevel)/.codeflow/verification/run.py\" setup; fi",
+  "check": "if command -v industriconnect-check >/dev/null 2>&1; then industriconnect-check; else python3 \"$(git rev-parse --show-toplevel)/.codeflow/verification/run.py\" check; fi",
+  "image": "industriconnect-checks:main-28ae643",
+  "limits": {
+    "checkTimeoutMin": 45
+  },
+  "prove": true,
+  "run": {
+    "command": "cd mcp-manager-ui && ./node_modules/.bin/concurrently --kill-others --names UI,API 'npm run dev:frontend -- --host 127.0.0.1 --port \"$PORT\" --strictPort' 'PORT=3003 npm run dev:backend'",
+    "port": 3001
+  }
+}

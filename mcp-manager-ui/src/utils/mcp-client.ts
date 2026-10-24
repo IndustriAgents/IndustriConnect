@@ -6,11 +6,12 @@ interface WSMessage {
     [key: string]: any;
 }
 
-class MCPClientManager {
+export class MCPClientManager {
     private servers: Map<string, MCPServer> = new Map();
     private listeners: ((servers: MCPServer[]) => void)[] = [];
     private ws: WebSocket | null = null;
     private isConnected = false;
+    private requestSequence = 0;
 
     constructor() {
         this.connectWebSocket();
@@ -167,16 +168,24 @@ class MCPClientManager {
             throw new Error('Backend not connected');
         }
 
+        const requestId = globalThis.crypto?.randomUUID?.()
+            ?? `call-${Date.now()}-${++this.requestSequence}`;
+        const socket = this.ws;
         return new Promise((resolve, reject) => {
+            const cleanup = () => {
+                clearTimeout(timer);
+                window.removeEventListener('mcp-tool-result', handleResult);
+            };
             const handleResult = (event: Event) => {
                 const customEvent = event as CustomEvent;
                 const message = customEvent.detail;
 
                 if (message.type === 'tool_result' &&
+                    message.requestId === requestId &&
                     message.serverId === serverId &&
                     message.toolName === toolName) {
 
-                    window.removeEventListener('mcp-tool-result', handleResult);
+                    cleanup();
 
                     if (message.success) {
                         resolve(message.result);
@@ -186,21 +195,26 @@ class MCPClientManager {
                 }
             };
 
+            // A late reply must never satisfy a later call to the same tool.
+            // Require the exact request ID, including after a timeout.
+            const timer = setTimeout(() => {
+                cleanup();
+                reject(new Error('Tool execution timed out; delivery and outcome are unknown'));
+            }, 30000);
             window.addEventListener('mcp-tool-result', handleResult);
 
-            // Send the call request
-            this.ws?.send(JSON.stringify({
-                type: 'call_tool',
-                serverId,
-                toolName,
-                arguments: args
-            }));
-
-            // Timeout after 30 seconds
-            setTimeout(() => {
-                window.removeEventListener('mcp-tool-result', handleResult);
-                reject(new Error('Tool execution timed out'));
-            }, 30000);
+            try {
+                socket.send(JSON.stringify({
+                    type: 'call_tool',
+                    requestId,
+                    serverId,
+                    toolName,
+                    arguments: args
+                }));
+            } catch (error) {
+                cleanup();
+                reject(error);
+            }
         });
     }
 

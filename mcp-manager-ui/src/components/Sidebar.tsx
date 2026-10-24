@@ -47,10 +47,10 @@ export default function Sidebar({
         <div className="flex items-center justify-between mb-4">
           <div className="min-w-0">
             <h1 className="text-lg font-semibold tracking-tight truncate">
-              LLM Chat
+              IndustriConnect
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5 truncate">
-              IndustriConnect
+              MCP Manager
             </p>
           </div>
           <button

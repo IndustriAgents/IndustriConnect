@@ -127,12 +127,13 @@ export class MCPWebSocketServer {
     }
 
     private async handleCallTool(ws: WebSocket, message: CallToolMessage) {
-        const { serverId, toolName, arguments: args } = message;
+        const { requestId, serverId, toolName, arguments: args } = message;
 
         try {
             const result = await this.mcpManager.callTool(serverId, toolName, args);
             const response: ToolResultMessage = {
                 type: 'tool_result',
+                requestId,
                 serverId,
                 toolName,
                 success: true,
@@ -142,6 +143,7 @@ export class MCPWebSocketServer {
         } catch (error) {
             const response: ToolResultMessage = {
                 type: 'tool_result',
+                requestId,
                 serverId,
                 toolName,
                 success: false,

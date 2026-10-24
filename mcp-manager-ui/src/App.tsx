@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ThemeProvider } from './components/ThemeProvider';
 import IndustrialUI from './components/IndustrialUI';
 import MCPServerConfigPanel from './components/MCPServerConfig';
+import ModelSettings from './components/ModelSettings';
 import {
   ChatMessage,
   ChatSession,
@@ -28,42 +29,40 @@ import {
 import { mcpClientManager } from './utils/mcp-client';
 import { getTheme, setTheme } from './utils/theme';
 import { format } from 'date-fns';
-import { callCloudLLM, callOllama } from './utils/llm';
+import {
+  CLOUD_PROVIDER_LABELS,
+  callCloudLLM,
+  callOllama,
+  isChatBackendReady,
+} from './utils/llm';
 
 function AppContent() {
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  // Saved settings are read as the initial state, not in a mount effect. The
+  // save effects below run on mount too; reading in an effect let them write
+  // the defaults back first, and under StrictMode's double mount the second
+  // read then found those defaults instead of what the operator had chosen.
+  const [sessions, setSessions] = useState<ChatSession[]>(loadSessions);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
   );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [chatBackend, setChatBackend] = useState<ChatBackend>('cloud-llm');
+  const [chatBackend, setChatBackend] = useState<ChatBackend>(loadChatBackend);
   const [cloudLLMConfig, setCloudLLMConfig] = useState<CloudLLMConfig | null>(
-    null,
+    loadCloudLLMConfig,
   );
-  const [ollamaConfig, setOllamaConfig] = useState<OllamaConfig | null>(null);
+  const [ollamaConfig, setOllamaConfig] = useState<OllamaConfig | null>(
+    loadOllamaConfig,
+  );
 
   // MCP state
   const [mcpConfig, setMcpConfig] = useState<MCPServersConfig>({ mcpServers: {} });
   const [mcpServers, setMcpServers] = useState<MCPServer[]>([]);
   const [showMCPConfig, setShowMCPConfig] = useState(false);
+  const [showModelSettings, setShowModelSettings] = useState(false);
 
-  // Load data from localStorage on mount
   useEffect(() => {
-    const loadedSessions = loadSessions();
-    const loadedChatBackend = loadChatBackend();
-    const loadedCloudConfig = loadCloudLLMConfig();
-    const loadedOllamaConfig = loadOllamaConfig();
     const loadedMCPConfig = loadMCPServersConfig();
-
-    setSessions(loadedSessions);
-    setChatBackend(loadedChatBackend);
-    if (loadedCloudConfig) {
-      setCloudLLMConfig(loadedCloudConfig);
-    }
-    if (loadedOllamaConfig) {
-      setOllamaConfig(loadedOllamaConfig);
-    }
 
     // Load MCP configuration
     setMcpConfig(loadedMCPConfig);
@@ -169,14 +168,14 @@ function AppContent() {
     }
 
     try {
-      let assistantResponse: { content: string; toolCalls?: any[] } | null = null;
+      let assistantResponse: { content: string; toolCalls?: any[]; error?: boolean } | null = null;
 
       if (chatBackend === 'cloud-llm' && cloudLLMConfig) {
         assistantResponse = await callCloudLLM(allMessages, cloudLLMConfig);
       } else if (chatBackend === 'ollama' && ollamaConfig) {
         assistantResponse = await callOllama(allMessages, ollamaConfig);
       } else {
-        throw new Error('Chat backend is not configured.');
+        throw new Error('No model selected. Choose one with the model button in the top bar.');
       }
 
       if (!assistantResponse || !assistantResponse.content) {
@@ -189,6 +188,7 @@ function AppContent() {
         content: assistantResponse.content,
         timestamp: new Date(),
         toolCalls: assistantResponse.toolCalls,
+        error: assistantResponse.error,
       };
 
       setMessages((prev) => [...prev, response]);
@@ -224,6 +224,14 @@ function AppContent() {
     }
   };
 
+  const isModelReady = isChatBackendReady(chatBackend, cloudLLMConfig, ollamaConfig);
+  let modelLabel: string | null = null;
+  if (chatBackend === 'ollama' && ollamaConfig?.model) {
+    modelLabel = `Ollama · ${ollamaConfig.model}`;
+  } else if (chatBackend === 'cloud-llm' && cloudLLMConfig?.model) {
+    modelLabel = `${CLOUD_PROVIDER_LABELS[cloudLLMConfig.provider]} · ${cloudLLMConfig.model}`;
+  }
+
   return (
     <>
       <IndustrialUI
@@ -234,12 +242,29 @@ function AppContent() {
         onMCPConnect={handleMCPConnect}
         onMCPDisconnect={handleMCPDisconnect}
         onOpenSettings={() => setShowMCPConfig(true)}
+        modelLabel={modelLabel}
+        isModelReady={isModelReady}
+        onOpenModelSettings={() => setShowModelSettings(true)}
       />
       {showMCPConfig && (
         <MCPServerConfigPanel
           config={mcpConfig}
           onConfigChange={handleMCPConfigChange}
           onClose={() => setShowMCPConfig(false)}
+        />
+      )}
+      {showModelSettings && (
+        <ModelSettings
+          chatBackend={chatBackend}
+          cloudLLMConfig={cloudLLMConfig}
+          ollamaConfig={ollamaConfig}
+          onApply={(backend, cloud, ollama) => {
+            setChatBackend(backend);
+            setCloudLLMConfig(cloud);
+            setOllamaConfig(ollama);
+            setShowModelSettings(false);
+          }}
+          onClose={() => setShowModelSettings(false)}
         />
       )}
     </>

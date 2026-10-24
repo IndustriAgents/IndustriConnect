@@ -107,3 +107,11 @@ export const IconTerminal = ({ className }: IconProps) => (
     <path d="M7.5 9.5 10 12l-2.5 2.5M12.5 15h4" />
   </svg>
 );
+
+export const IconChip = ({ className }: IconProps) => (
+  <svg {...base} className={className}>
+    <rect x="6" y="6" width="12" height="12" rx="2" />
+    <rect x="9.5" y="9.5" width="5" height="5" rx="0.5" />
+    <path d="M9.5 3v3M14.5 3v3M9.5 18v3M14.5 18v3M3 9.5h3M3 14.5h3M18 9.5h3M18 14.5h3" />
+  </svg>
+);

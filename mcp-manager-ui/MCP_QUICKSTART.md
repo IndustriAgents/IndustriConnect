@@ -1,6 +1,6 @@
 # MCP Server Integration Quick Start
 
-This guide helps you quickly get started with MCP (Model Context Protocol) server integration in the LLM Chat UI.
+This guide helps you quickly get started with MCP (Model Context Protocol) server integration in IndustriConnect.
 
 ## What is MCP?
 
@@ -18,18 +18,18 @@ because the protocol folders are git submodules (see the root `README.md`).
 You have three options:
 
 **Option A: Import from File**
-1. Click "Configure Servers" in the sidebar
-2. Click "Import File"
+1. Click **+** next to **Active nodes**, or **Server configuration** in the sidebar
+2. Click **Import**
 3. Select `mcp-config-example.json` from this directory
 
 **Option B: Import from JSON**
-1. Click "Configure Servers"
-2. Switch to "JSON Editor" mode
+1. Open **Server configuration**
+2. Switch to the **JSON** tab
 3. Paste the example configuration from `mcp-config-example.json`
-4. Click "Apply JSON Configuration"
+4. Click **Apply configuration**
 
 **Option C: Manual Form Entry**
-1. Click "Configure Servers"
+1. Open **Server configuration**
 2. Fill in the form:
    - **Server Name**: `MQTT MCP (Python)`
    - **Command**: `uv`
@@ -47,7 +47,7 @@ You have three options:
        "MQTT_CLIENT_ID": "mqtt-mcp-cursor"
      }
      ```
-3. Click "Add Server"
+3. Click **Add server**
 
 ### 2. Start the UI and Its Backend
 
@@ -59,13 +59,13 @@ PORT=3003 npm run dev
 ```
 
 The browser cannot start processes itself, so this also starts `mcp-backend`.
-When you click **Connect**, the backend launches the server over stdio with the
+When you click a configured server in the sidebar, the backend launches it over stdio with the
 command, arguments and environment from your configuration. You do not start
 the MCP servers yourself. The UI opens at http://localhost:3000.
 
 Keep `PORT=3003`: the UI looks for the backend at `ws://localhost:3003`.
 Without it the backend listens on its default port, 3000, which the UI itself
-uses, and **Connect** fails. In PowerShell, run `$env:PORT=3003; npm run dev`
+uses, and server connections fail. In PowerShell, run `$env:PORT=3003; npm run dev`
 instead.
 
 Check that each command works from a terminal first. It should start and then
@@ -83,23 +83,25 @@ cd /absolute/path/to/IndustriConnect/OPCUA-Project/packages/server-python
 uv run opcua-mcp-server
 ```
 
-The servers also need something to talk to. For local testing, use the mocks:
-`uv run mqtt-mock-server` in `MQTT-Project/mqtt-mock-server`, and
+The servers also need something to talk to. For local testing, start a broker
+(such as `mosquitto -p 1883`) in a separate terminal, then run
+`uv run mqtt-mock-server` in `MQTT-Project/mqtt-mock-server` to publish Sparkplug
+data to it. The MQTT mock does not include a broker. For OPC UA, run
 `uv run opcua-mock-server` in `OPCUA-Project/packages/mock-server`.
 
 ### 3. Connect in the UI
 
-1. In the sidebar, expand "MCP Servers"
-2. Click "Connect" next to your server
-3. Wait for the status to turn green
-4. Expand the server to view available tools
+1. Under **Active nodes**, click your server to connect
+2. Wait for its status dot to turn green
+3. Click the model button in the top bar to configure a cloud provider or Ollama
+4. Click the server again when you want to disconnect
 
 ### 4. Use MCP Tools in Chat
 
 Once connected, you can reference MCP capabilities in your chat:
 - "List all available MCP tools"
 - "Publish 'hello world' to MQTT topic 'test'"
-- "Read the temperature value from OPC UA node ns=2;s=Temperature"
+- "Read the temperature value from OPC UA mock node ns=2;i=3"
 
 ## Current Implementation Status
 
@@ -107,7 +109,7 @@ Once connected, you can reference MCP capabilities in your chat:
 - MCP server configuration UI (form & JSON)
 - Import/Export Cursor-style configuration
 - Server connection management through `mcp-backend`, which spawns each server over stdio and relays it to the browser over WebSocket
-- Tool listing and display
+- Automatic tool discovery and display of tool calls and their results
 - Tool calls from the LLM (OpenAI, Gemini, Anthropic and Ollama), executed on the real server
 - Persistent configuration storage
 
@@ -122,7 +124,7 @@ Once connected, you can reference MCP capabilities in your chat:
 
 **No tools showing:**
 - Make sure the server status is "connected" (green)
-- Click the expand arrow next to the server name
+- Ask the selected model which tools it can use; calls and results appear in the transcript
 - Check browser console for errors
 
 **Configuration not saving:**
