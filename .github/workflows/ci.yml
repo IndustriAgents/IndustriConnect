@@ -14,6 +14,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  protocol-tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check protocol workspace tooling
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+
   ui:
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -2,3 +2,7 @@
 .env
 .env.local
 
+
+# Local protocol verification outputs
+.build/
+__pycache__/
