@@ -203,6 +203,21 @@
 .tb-icon:hover { color: var(--ink); border-color: var(--line-strong); }
 .tb-icon svg { width: 16px; height: 16px; }
 
+/* The model in use. A button rather than a label: it is the setting an
+   operator changes mid-shift, and where a missing API key gets fixed. Dashed
+   while nothing usable is chosen, the one state that blocks a command. */
+.tb-model {
+  display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 280px;
+  padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line-strong);
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.04em;
+  color: var(--ink-soft); white-space: nowrap;
+  transition: color 0.18s var(--ease-soft), border-color 0.18s var(--ease-soft);
+}
+.tb-model:hover { color: var(--ink); border-color: var(--ink-soft); }
+.tb-model svg { width: 14px; height: 14px; flex-shrink: 0; }
+.tb-model-text { overflow: hidden; text-overflow: ellipsis; }
+.tb-model.is-unset { border-style: dashed; color: var(--ink); }
+
 /* ───────────── Main / console ───────────── */
 .main {
   grid-area: main;
@@ -358,6 +373,7 @@
 .btn.is-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .btn.is-primary:hover { background: var(--ink); opacity: 0.82; }
 .btn.is-danger:hover { border-color: var(--alert); color: var(--alert); background: transparent; }
+.btn:disabled { opacity: 0.45; cursor: default; }
 .btn svg { width: 12px; height: 12px; }
 
 .segmented {
@@ -387,6 +403,10 @@
   background: var(--bg); border: 1px solid var(--line-strong); border-radius: 16px;
   overflow: hidden;
 }
+.modal.is-narrow { max-width: 520px; }
+/* The dialog takes focus only as a landing spot for Tab; a ring around the
+   whole panel says nothing its fields' own focus styles do not. */
+.modal:focus-visible { outline: none; }
 .modal-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 16px 20px; border-bottom: 1px solid var(--line);
@@ -406,6 +426,10 @@
 }
 .modal-body::-webkit-scrollbar { width: 8px; }
 .modal-body::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+.modal-foot {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 20px; border-top: 1px solid var(--line); background: var(--bg-deep);
+}
 
 .modal-section + .modal-section {
   margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line);
@@ -446,14 +470,17 @@
   text-transform: uppercase; color: var(--ink-faint); font-weight: 500;
 }
 .field .req { color: var(--ink); }
-.field input, .field textarea {
+.field > .segmented { align-self: flex-start; }
+.field-row { display: flex; align-items: center; gap: 8px; }
+.field-row input { flex: 1; min-width: 0; }
+.field input, .field textarea, .field select {
   width: 100%; border: 1px solid var(--line-strong); border-radius: 9px;
   background: var(--bg); padding: 9px 12px;
   font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--ink);
   outline: 0; resize: vertical;
   transition: border-color 0.18s var(--ease-soft);
 }
-.field input:focus, .field textarea:focus { border-color: var(--ink); }
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--ink); }
 .field input::placeholder, .field textarea::placeholder { color: var(--ink-faint); }
 .field-note { font-size: 11.5px; line-height: 1.5; color: var(--ink-faint); }
 .field-error {
@@ -539,6 +566,8 @@
   .tb-right { gap: 6px; }
   .tb-pill { font-size: 9px; letter-spacing: 0.1em; padding: 7px 10px; }
   .tb-pill .pill-text { display: none; }
+  .tb-model { padding: 7px 9px; }
+  .tb-model-text { display: none; }
 
   .transcript { padding: 14px 12px 6px; }
   .turn { padding: 14px 0; }
@@ -562,6 +591,8 @@
   .modal-body { padding: 16px 16px 24px; }
   .modal-toolbar .spacer { display: none; }
   .modal-toolbar .btn { flex: 1 1 auto; }
+  .modal-foot { padding: 12px 16px; }
+  .modal-foot .btn { flex: 1 1 auto; }
 }
 
 @media (max-width: 420px) {

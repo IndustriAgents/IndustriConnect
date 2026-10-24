@@ -55,6 +55,7 @@ export interface ListToolsMessage extends WSMessage {
 
 export interface CallToolMessage extends WSMessage {
     type: 'call_tool';
+    requestId?: string;
     serverId: string;
     toolName: string;
     arguments: Record<string, unknown>;
@@ -83,6 +84,7 @@ export interface ToolsListedMessage extends WSMessage {
 
 export interface ToolResultMessage extends WSMessage {
     type: 'tool_result';
+    requestId?: string;
     serverId: string;
     toolName: string;
     success: boolean;

@@ -8,8 +8,14 @@ A collection of Model Context Protocol (MCP) servers and tools for industrial au
 
 This repository brings the suite together. Each protocol server is developed in its own repository under [IndustriAgents](https://github.com/IndustriAgents) and pinned here as a git submodule, alongside `mcp-manager-ui` and the whitepaper.
 
-<img width="1456" height="774" alt="Screenshot 2025-12-08 at 21 32 53" src="https://github.com/user-attachments/assets/de160a10-9def-466c-a679-7c6f08fe91d1" />
-
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mcp-manager-ui-dark.png">
+    <img src="docs/images/mcp-manager-ui-light.png" width="900" alt="The mcp-manager-ui console with the OPC UA and Modbus servers connected and a local Ollama model selected. An operator asks for four plant sensor values; the model calls read_opcua_nodes and answers with the readings. Then the operator asks who made the Modbus device; the model calls read_device_information and answers Mock ICS, model MODBUS-MOCK, version 0.1. Each tool call is listed under the answer with its result.">
+  </picture>
+  <br>
+  <sub><a href="#mcp-manager-ui"><code>mcp-manager-ui</code></a> talking to the OPC UA and Modbus servers, which are reading from their bundled mocks.</sub>
+</p>
 
 All protocol stacks follow the same pattern:
 
@@ -38,7 +44,8 @@ IndustriConnect/
 ├── PROFINET-Project/    # submodule -> IndustriAgents/PROFINET-MCP
 ├── S7comm-Project/      # submodule -> IndustriAgents/S7comm-MCP
 ├── mcp-manager-ui/      # Web UI for managing MCP servers and LLMs
-└── whitepaper/          # Architecture and design background
+├── whitepaper/          # Architecture and design background
+└── docs/images/         # Screenshots used in this README
 ```
 
 Every `*-Project/` folder is a git submodule, so it stays empty until you
@@ -80,9 +87,16 @@ specialised mocks. Its README covers all of them.
 
 The Model Context Protocol (MCP) is a simple, transport‑agnostic way to expose tools and data sources to AI assistants over stdio. In this suite, MCP servers act as protocol‑aware “gateways” between an assistant and industrial systems:
 
-- MCP client (e.g., Claude Desktop, mcp-manager-ui, or another MCP runner)
-- ↔ MCP server (e.g., Modbus, OPC UA, S7comm)
-- ↔ Industrial device / mock device
+```mermaid
+flowchart LR
+    client["MCP client<br/>Claude Desktop<br/>mcp-manager-ui<br/>other MCP runners"]
+    server["Protocol MCP server<br/>Modbus, OPC UA,<br/>S7comm, ..."]
+    device["PLC or field device"]
+    mock["Mock device<br/>bundled with every server"]
+    client -->|"MCP over stdio"| server
+    server -->|"industrial protocol"| device
+    server -.->|"mock transport, for local testing"| mock
+```
 
 This separation keeps:
 
@@ -95,44 +109,24 @@ You can safely develop and test flows against mocks before connecting to real PL
 
 ## Projects Overview
 
-High‑level summary of each protocol project, with the repository it is developed in:
+Each protocol folder is a git submodule tracking the repository the server is developed in:
 
-- `MODBUS-Project/` — git submodule tracking [IndustriAgents/MODBUS-MCP](https://github.com/IndustriAgents/MODBUS-MCP)
-  - **modbus-python** – Modbus TCP/UDP/RTU client wrapped as an MCP server
-  - **modbus-mock-server** – Mock Modbus TCP device with a realistic register map
-- `MQTT-Project/` — git submodule tracking [IndustriAgents/MQTT-MCP](https://github.com/IndustriAgents/MQTT-MCP)
-  - **mqtt-python** – MQTT + Sparkplug B MCP server (publish, subscribe, Sparkplug lifecycle)
-  - **mqtt-mock-server** – Sparkplug edge nodes; requires a separate MQTT broker such as Mosquitto
-- `OPCUA-Project/` — git submodule tracking [IndustriAgents/OPCUA-MCP](https://github.com/IndustriAgents/OPCUA-MCP)
-  - **packages/server-python** – OPC UA MCP server (read/write nodes, browse, methods, bulk operations)
-  - **packages/server-node** – the same tool contract on Node, published to npm
-  - **packages/mock-server** – Rich mock OPC UA server simulating an industrial plant
-- `BACnet-Project/` — git submodule tracking [IndustriAgents/BACnet-MCP](https://github.com/IndustriAgents/BACnet-MCP)
-  - **bacnet-python** – BACnet/IP MCP server
-  - **bacnet-mock-device** – Mock BACnet device for discovery and property access tests
-- `DNP3-Project/` — git submodule tracking [IndustriAgents/DNP3-MCP](https://github.com/IndustriAgents/DNP3-MCP)
-  - **dnp3-python** – DNP3 master MCP server
-  - **dnp3-mock-outstation** – Mock DNP3 outstation
-- `EtherCAT-Project/` — git submodule tracking [IndustriAgents/EtherCAT-MCP](https://github.com/IndustriAgents/EtherCAT-MCP)
-  - **ethercat-python** – EtherCAT MCP server (PySOEM‑based)
-  - **ethercat-mock-slave** – Mock EtherCAT slave for local smoke tests
-- `EtherNetIP-Project/` — git submodule tracking [IndustriAgents/EtherNetIP-MCP](https://github.com/IndustriAgents/EtherNetIP-MCP)
-  - **ethernetip-python** – EtherNet/IP MCP server (Rockwell/AB controllers)
-  - **ethernetip-mock-server** – JSON bridge with representative tags/UDTs; enable `ENIP_JSON_BRIDGE` for this mock
-- `PROFIBUS-Project/` — git submodule tracking [IndustriAgents/PROFIBUS-MCP](https://github.com/IndustriAgents/PROFIBUS-MCP)
-  - **profibus-python** – Mock backend and GSD parsing; real DP master is not implemented
-  - **profibus-mock-slave** – TCP mock; use `PROFIBUS_BACKEND=mock`
-- `PROFINET-Project/` — git submodule tracking [IndustriAgents/PROFINET-MCP](https://github.com/IndustriAgents/PROFINET-MCP)
-  - **profinet-python** – Network DCP discovery and GSDML parsing; I/O and configuration use the mock backend
-  - **profinet-mock-server** – JSON mock IO device; use `PROFINET_BACKEND=mock`
-- `S7comm-Project/` — git submodule tracking [IndustriAgents/S7comm-MCP](https://github.com/IndustriAgents/S7comm-MCP)
-  - **s7comm-python** – Siemens S7 (S7comm) MCP server using `python-snap7`
-  - **s7comm-mock-server** – Mock Siemens PLC for DB/I/O/SZL testing
-- `mcp-manager-ui/`
-  - React + TypeScript web UI for:
-    - Connecting to multiple local/remote MCP servers
-    - Chatting with LLMs using those tools
-    - Inspecting tool schemas and responses
+| Protocol | Folder → repository | MCP server | Mock |
+|---|---|---|---|
+| Modbus | `MODBUS-Project/` → [MODBUS-MCP](https://github.com/IndustriAgents/MODBUS-MCP) | **modbus-python**: Modbus TCP/UDP/RTU client | **modbus-mock-server**: Modbus TCP device with a realistic register map |
+| MQTT / Sparkplug B | `MQTT-Project/` → [MQTT-MCP](https://github.com/IndustriAgents/MQTT-MCP) | **mqtt-python**: publish, subscribe, Sparkplug lifecycle | **mqtt-mock-server**: Sparkplug edge nodes; requires a separate MQTT broker such as Mosquitto |
+| OPC UA | `OPCUA-Project/` → [OPCUA-MCP](https://github.com/IndustriAgents/OPCUA-MCP) | **packages/server-python**: read/write nodes, browse, methods, bulk operations<br>**packages/server-node**: the same tool contract on Node, published to npm | **packages/mock-server**: an industrial plant with sensors, actuators and methods |
+| BACnet/IP | `BACnet-Project/` → [BACnet-MCP](https://github.com/IndustriAgents/BACnet-MCP) | **bacnet-python** | **bacnet-mock-device**: discovery and property access |
+| DNP3 | `DNP3-Project/` → [DNP3-MCP](https://github.com/IndustriAgents/DNP3-MCP) | **dnp3-python**: DNP3 master | **dnp3-mock-outstation** |
+| EtherCAT | `EtherCAT-Project/` → [EtherCAT-MCP](https://github.com/IndustriAgents/EtherCAT-MCP) | **ethercat-python**: PySOEM-based | **ethercat-mock-slave**: local smoke tests |
+| EtherNet/IP | `EtherNetIP-Project/` → [EtherNetIP-MCP](https://github.com/IndustriAgents/EtherNetIP-MCP) | **ethernetip-python**: Rockwell/AB controllers | **ethernetip-mock-server**: JSON bridge with representative tags and UDTs; enable `ENIP_JSON_BRIDGE` for this mock |
+| PROFIBUS | `PROFIBUS-Project/` → [PROFIBUS-MCP](https://github.com/IndustriAgents/PROFIBUS-MCP) | **profibus-python**: mock backend and GSD parsing; real DP master is not implemented | **profibus-mock-slave**: TCP mock; use `PROFIBUS_BACKEND=mock` |
+| PROFINET | `PROFINET-Project/` → [PROFINET-MCP](https://github.com/IndustriAgents/PROFINET-MCP) | **profinet-python**: network DCP discovery and GSDML parsing; I/O and configuration use the mock backend | **profinet-mock-server**: JSON mock IO device; use `PROFINET_BACKEND=mock` |
+| Siemens S7 | `S7comm-Project/` → [S7comm-MCP](https://github.com/IndustriAgents/S7comm-MCP) | **s7comm-python**: uses `python-snap7` | **s7comm-mock-server**: Siemens PLC for DB, I/O and SZL tests |
+
+[`mcp-manager-ui/`](#mcp-manager-ui) lives in this repository. It is a React +
+TypeScript console that connects to several MCP servers at once, chats with an
+LLM that can call their tools, and shows each tool call and its response.
 
 For details and protocol‑specific examples, open the `README.md` in each project directory, or on the project's repository.
 
@@ -237,7 +231,26 @@ The `mcp-manager-ui` project provides a browser UI for:
 - Testing tools interactively
 - Running conversations against one or more MCP servers
 
-See `mcp-manager-ui/README.md` for installation and usage instructions.
+```bash
+cd mcp-manager-ui
+npm install
+(cd mcp-backend && npm install)
+PORT=3003 npm run dev   # UI on http://localhost:3000, backend on port 3003
+```
+
+Add servers under **Server configuration** in the same `mcpServers` JSON
+format Claude Desktop and Cursor use (`mcp-config-example.json` is a starting
+point), then click a node in the sidebar to connect it. The backend launches
+each server over stdio, so you only start the mocks or devices they point at.
+Pick the model with the model button in the top bar: OpenAI, Gemini or
+Anthropic with your API key, or a local Ollama model. The model calls the
+connected servers' tools and answers in plain language, with each tool call
+and its result listed under the answer. The screenshot at the top of this page
+is the console with the OPC UA and Modbus servers connected to their mocks and
+a local Ollama model answering.
+
+See [`mcp-manager-ui/README.md`](mcp-manager-ui/README.md) for LLM provider
+setup and the rest of the options.
 
 ---
 

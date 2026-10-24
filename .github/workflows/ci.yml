@@ -21,6 +21,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Check protocol workspace tooling
         run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+      - name: Check offline verification wrappers
+        run: python3 -m unittest discover -s .codeflow/verification/tests -v
 
   ui:
     runs-on: ubuntu-latest
@@ -46,6 +48,9 @@ jobs:
       - name: Install frontend dependencies
         working-directory: mcp-manager-ui
         run: npm ci --no-audit --no-fund
+      - name: Check frontend provider loops and persistence
+        working-directory: mcp-manager-ui
+        run: npm test
       - name: Build frontend
         working-directory: mcp-manager-ui
         run: npm run build

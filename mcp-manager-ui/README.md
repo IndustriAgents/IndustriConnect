@@ -1,17 +1,16 @@
-# LLM Chat UI
+# IndustriConnect
 
-A modern, intuitive chat interface for working with local and third‑party language models in the IndustriConnect ecosystem. Built with React, TypeScript, and Tailwind CSS.
+The IndustriConnect MCP Manager: a web console for talking to industrial MCP servers through a cloud or local language model. Built with React and TypeScript.
 
 ## Features
 
-- 🎨 **Beautiful UI** – Modern interface inspired by Claude Code with clean design  
-- 🌓 **Dark/Light Mode** – Seamless theme switching with system preference detection  
-- 🔌 **MCP Server Integration** – Connect and manage Model Context Protocol servers (MQTT, OPC UA, etc.)
-- ☁️ **Cloud LLM Support** – Talk to OpenAI (ChatGPT), Google Gemini, and Anthropic Claude  
-- 💻 **Local LLM Support (Ollama)** – Chat with local models running via Ollama  
-- 💬 **Interactive Chat** – Streaming‑style conversational UI with copy‑to‑clipboard  
-- 📝 **Session Management** – Simple session list to keep track of conversations  
-- 💾 **Local Storage** – Remembers chat backend and LLM configuration between visits
+- 🖥️ **Operator console** – A transcript of commands and answers, with every tool call and its result shown under the answer it produced
+- 🌓 **Dark/Light Mode** – Seamless theme switching with system preference detection
+- 🔌 **MCP Server Integration** – Connect and manage Model Context Protocol servers (MQTT, OPC UA, Modbus, etc.)
+- ☁️ **Cloud LLM Support** – Talk to OpenAI, Google Gemini, and Anthropic Claude
+- 💻 **Local LLM Support (Ollama)** – Chat with local models running via Ollama
+- 🛠️ **Tool calling** – The model calls tools on the connected servers, reads the results, and answers in plain language
+- 💾 **Local Storage** – Remembers your servers, chosen model and theme between visits. Provider API keys entered in the model dialog are kept only in memory
 
 ## Getting Started
 
@@ -46,17 +45,10 @@ Without it the backend listens on its default port, 3000, which the UI itself
 uses, and **Connect** fails. In PowerShell, run `$env:PORT=3003; npm run dev`
 instead.
 
-## Features
-
-- **Chat Interface**: Interact with Cloud LLMs (OpenAI, Gemini, Anthropic) or local Ollama models.
-- **MCP Server Integration**: Configure and connect to real MCP servers (MQTT, OPC UA, etc.).
-- **Tool Calling**: LLMs can automatically discover and use tools provided by connected MCP servers.
-- **Real-time Updates**: WebSocket connection ensures live status updates from MCP servers.
-
 ## Usage
 
-1. **Configure MCP Servers** (New!)
-   - Click "Configure Servers" in the MCP Servers section of the sidebar
+1. **Configure MCP Servers**
+   - Click **+** next to "Active nodes" in the sidebar, or **Server configuration**
    - Option 1: Use the form to add servers manually
    - Option 2: Import a Cursor-style JSON configuration file
    - Option 3: Use JSON editor mode to paste configuration directly
@@ -67,51 +59,57 @@ instead.
 
 2. **Connect to MCP Servers**
    - Keep the backend running (`PORT=3003 npm run dev` starts it). It launches each configured server over stdio when you connect, so you do not start the servers yourself
-   - In the sidebar, click "Connect" next to each configured server
-   - View available tools by expanding the server entry
-   - Connected servers will show a green indicator
+   - Click a server in the sidebar to connect it, and click it again to disconnect
+   - Connected servers show a green dot, and the top bar counts how many are live
 
-3. **Choose a Chat Backend**
-   - In the top bar of the chat panel, select:
-     - `Cloud LLM (ChatGPT / Gemini / Claude)` or  
-     - `Local Ollama`
+3. **Choose a Model**
+   - Click the model button in the top bar. It reads **Choose a model** until one is set, and is dashed while a cloud model still needs an API key
+   - **Cloud**: pick OpenAI, Gemini or Anthropic and enter a model id. The field suggests a few, but takes any id the provider serves. For OpenAI you can also set a base URL, for any server that speaks the OpenAI chat API
+   - Provide the API key either:
+     - via `.env` file (`VITE_OPENAI_API_KEY`, `VITE_GEMINI_API_KEY`, `VITE_ANTHROPIC_API_KEY`), or
+     - in the dialog. A key typed there stays in memory for that tab only and is never written to the browser's storage
+   - **Local · Ollama**: ensure Ollama is running (default: `http://localhost:11434`), then pick one of its models. **Refresh** lists them again after you change the URL or pull a new model
+   - Tool calling needs a model that supports tools. Give a local model enough context for the full tool list: with Ollama's default context window, the tool definitions of several connected servers can be cut short and the model will not see some tools
 
-4. **Configure Cloud LLMs**
-   - Select a provider (OpenAI, Gemini, Anthropic)
-   - Pick a model from the dropdown
-   - Provide an API key either:
-     - via `.env` file (`VITE_OPENAI_API_KEY`, `VITE_GEMINI_API_KEY`, `VITE_ANTHROPIC_API_KEY`), or  
-     - directly in the UI when prompted
-
-5. **Configure Ollama**
-   - Ensure Ollama is running locally (default: `http://localhost:11434`)
-   - Select or refresh the model list in the header
-
-6. **Start Chatting**
+4. **Start Chatting**
    - Type your message in the input box
    - Press `Enter` to send, `Shift+Enter` for a new line
-   - Click the copy icon on assistant messages to copy responses
+   - The model may call several tools, up to eight rounds per message, before it answers. Each call and its result is listed under the answer, and a failed call is marked **DENIED / FAILED**
 
-7. **Manage Sessions**
-   - Sessions are created automatically when you start chatting
-   - Use the sidebar to switch between sessions
+Requests to cloud providers go straight from the browser to the provider (or
+the configured OpenAI-compatible base URL). `VITE_*` values are embedded in the
+frontend bundle: use environment keys only for a private local setup, and enter
+keys in the dialog when sharing a build. MCP server configuration, including
+any environment variables in it, is saved in browser storage.
+
+For
+Claude Fable 5.1, Claude Opus 5.5, Claude Opus 5 and Claude Sonnet 5.5 the
+request opts into [Anthropic’s server-side fallback](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback)
+(`fallbacks: "default"`). If the refusal category has a recommended fallback,
+the API retries there; categories without a recommended fallback remain refused.
 
 ## Project Structure
 
 ```
 mcp-manager-ui/
 ├── src/
-│   ├── components/        # React components
-│   │   ├── Sidebar.tsx    # Left sidebar with sessions and theme toggle
-│   │   ├── ChatPanel.tsx  # Right panel for chat interface
+│   ├── components/
+│   │   ├── IndustrialUI.tsx    # The console: sidebar, top bar, transcript, composer
+│   │   ├── ModelSettings.tsx   # Model dialog (cloud provider or Ollama)
+│   │   ├── MCPServerConfig.tsx # Server configuration dialog
+│   │   ├── Icons.tsx           # Inline stroke icons
 │   │   └── ThemeProvider.tsx   # Theme context provider
-│   ├── types.ts           # TypeScript type definitions
-│   ├── utils/             # Utility functions
-│   │   ├── theme.ts       # Theme management
-│   │   ├── storage.ts     # LocalStorage helpers
-│   │   └── llm.ts         # Cloud/Ollama LLM helpers
+│   ├── types.ts               # Chat and LLM configuration types
+│   ├── types/mcp-types.ts     # MCP server, tool and tool-call types
+│   ├── utils/
+│   │   ├── llm.ts             # Cloud/Ollama calls and the tool-calling loop
+│   │   ├── mcp-client.ts      # WebSocket client for mcp-backend
+│   │   ├── mcp-storage.ts     # Server configuration in localStorage
+│   │   ├── storage.ts         # Chat backend and model settings in localStorage
+│   │   └── theme.ts           # Theme management
 │   ├── App.tsx            # Main application component
 │   └── main.tsx           # Entry point
+├── mcp-backend/           # Node service that runs the MCP servers over stdio
 ├── index.html
 ├── package.json
 └── vite.config.ts

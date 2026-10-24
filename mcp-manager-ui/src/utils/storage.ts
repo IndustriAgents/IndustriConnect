@@ -61,9 +61,27 @@ export const loadCloudLLMConfig = (): CloudLLMConfig | null => {
   if (!stored) return null;
   try {
     const parsed = JSON.parse(stored);
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed as CloudLLMConfig;
+    if (
+      !parsed || Array.isArray(parsed) ||
+      !['openai', 'gemini', 'anthropic'].includes(parsed.provider) ||
+      typeof parsed.model !== 'string' || !parsed.model.trim() ||
+      (parsed.baseUrl !== undefined && typeof parsed.baseUrl !== 'string')
+    ) {
+      saveCloudLLMConfig(null);
+      return null;
+    }
+    const config: CloudLLMConfig = {
+      provider: parsed.provider,
+      model: parsed.model.trim(),
+      ...(parsed.provider === 'openai' && parsed.baseUrl?.trim()
+        ? { baseUrl: parsed.baseUrl.trim() } : {}),
+    };
+    // Older installations may have stored a key. Never restore it into UI
+    // state, and scrub the legacy value even before the next save effect.
+    saveCloudLLMConfig(config);
+    return config;
   } catch {
+    localStorage.removeItem(STORAGE_KEYS.CLOUD_LLM_CONFIG);
     return null;
   }
 };
@@ -81,8 +99,12 @@ export const loadOllamaConfig = (): OllamaConfig | null => {
   if (!stored) return null;
   try {
     const parsed = JSON.parse(stored);
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed as OllamaConfig;
+    if (
+      !parsed || Array.isArray(parsed) ||
+      typeof parsed.model !== 'string' || !parsed.model.trim() ||
+      typeof parsed.baseUrl !== 'string' || !parsed.baseUrl.trim()
+    ) return null;
+    return { model: parsed.model.trim(), baseUrl: parsed.baseUrl.trim() };
   } catch {
     return null;
   }

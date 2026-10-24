@@ -194,7 +194,7 @@ export default function ChatPanel({
             </div>
             <div>
               <h2 className="text-base font-semibold tracking-tight">
-                LLM Chat
+                IndustriConnect
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Chat with cloud or local LLMs

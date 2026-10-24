@@ -1,5 +1,5 @@
 {
-  "name": "llm-chat-ui",
+  "name": "industriconnect",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -8,7 +8,8 @@
     "dev:backend": "cd mcp-backend && npm run dev",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "date-fns": "^2.30.0",
@@ -29,6 +30,7 @@
     "eslint-plugin-react-refresh": "^0.4.3",
     "postcss": "^8.4.27",
     "tailwindcss": "^3.3.3",
+    "tsx": "^4.23.15",
     "typescript": "^5.0.2",
     "vite": "^4.4.5"
   }

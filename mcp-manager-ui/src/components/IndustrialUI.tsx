@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ChatMessage } from '../types';
-import { MCPServer } from '../types/mcp-types';
+import { MCPServer, MCPToolCallResult } from '../types/mcp-types';
 import { format } from 'date-fns';
 import { useTheme } from './ThemeProvider';
 import {
+  IconChip,
   IconClose,
   IconHelp,
   IconLogs,
@@ -30,6 +31,10 @@ interface IndustrialUIProps {
   onMCPConnect: (serverId: string) => void;
   onMCPDisconnect: (serverId: string) => void;
   onOpenSettings: () => void;
+  /** "Provider · model", or null when no model has been chosen. */
+  modelLabel: string | null;
+  isModelReady: boolean;
+  onOpenModelSettings: () => void;
 }
 
 const statusDot = (status: MCPServer['status']) => {
@@ -46,6 +51,31 @@ const statusLabel = (status: MCPServer['status']) => {
   return 'disconnected — click to connect';
 };
 
+/** A tool result as an operator reads it: each text item on its own and JSON
+ *  pretty-printed, rather than the MCP envelope stringified with its escapes. */
+const formatToolOutput = (result: MCPToolCallResult | undefined): string | null => {
+  if (!result) return null;
+  const texts = (result.content || [])
+    .map((item) => item.text)
+    .filter((text): text is string => Boolean(text));
+  if (texts.length === 0) {
+    if (result.error) return result.error;
+    return result.result === undefined ? null : JSON.stringify(result.result, null, 2);
+  }
+  return texts
+    .map((text) => {
+      try {
+        return JSON.stringify(JSON.parse(text), null, 2);
+      } catch {
+        return text;
+      }
+    })
+    .join('\n\n');
+};
+
+const isFailedCall = (result: MCPToolCallResult | undefined) =>
+  Boolean(result?.isError || result?.success === false);
+
 export default function IndustrialUI({
   messages,
   onSendMessage,
@@ -54,6 +84,9 @@ export default function IndustrialUI({
   onMCPConnect,
   onMCPDisconnect,
   onOpenSettings,
+  modelLabel,
+  isModelReady,
+  onOpenModelSettings,
 }: IndustrialUIProps) {
   const [input, setInput] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -64,6 +97,11 @@ export default function IndustrialUI({
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const connectedCount = mcpServers.filter((s) => s.status === 'connected').length;
+  const modelStatus = isModelReady
+    ? `Model: ${modelLabel} — click to change`
+    : modelLabel
+      ? `${modelLabel} needs an API key — click to add one`
+      : 'No model selected — click to choose one';
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -104,6 +142,12 @@ export default function IndustrialUI({
   const send = () => {
     const content = input.trim();
     if (!content || isLoading) return;
+    // Without a model there is nothing to send to; ask for one and keep the
+    // draft rather than posting a message that can only come back as an error.
+    if (!isModelReady) {
+      onOpenModelSettings();
+      return;
+    }
     onSendMessage(content);
     setInput('');
   };
@@ -238,6 +282,16 @@ export default function IndustrialUI({
         </div>
 
         <div className="tb-right">
+          <button
+            type="button"
+            className={`tb-model${isModelReady ? '' : ' is-unset'}`}
+            onClick={onOpenModelSettings}
+            title={modelStatus}
+            aria-label={modelStatus}
+          >
+            <IconChip />
+            <span className="tb-model-text">{modelLabel ?? 'Choose a model'}</span>
+          </button>
           {/* On a phone the label is dropped for width, so the count alone is
               left on screen — the full reading has to stay reachable by tooltip
               and by assistive tech, which `display: none` would otherwise cut. */}
@@ -285,7 +339,14 @@ export default function IndustrialUI({
                   Connect a node from the sidebar, then ask for a reading, a setpoint, or a
                   status sweep in plain language.
                 </p>
-                <p className="ce-hint">Awaiting command</p>
+                {isModelReady ? (
+                  <p className="ce-hint">Awaiting command</p>
+                ) : (
+                  <button type="button" className="btn" onClick={onOpenModelSettings}>
+                    <IconChip />
+                    Choose a model
+                  </button>
+                )}
               </div>
             )}
 
@@ -307,21 +368,21 @@ export default function IndustrialUI({
 
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
                     <ul className="turn-calls">
-                      {msg.toolCalls.map((tool) => (
-                        <li key={tool.id} className={tool.result?.isError ? 'is-error' : undefined}>
-                          <div className="turn-call-head">
-                            <code>{tool.toolName}</code>
-                            <span className="turn-call-outcome">
-                              {tool.result?.isError ? 'DENIED / FAILED' : 'OK'}
-                            </span>
-                          </div>
-                          {tool.result?.content && (
-                            <pre className="turn-call-result">
-                              {JSON.stringify(tool.result.result ?? tool.result.content, null, 2)}
-                            </pre>
-                          )}
-                        </li>
-                      ))}
+                      {msg.toolCalls.map((tool) => {
+                        const failed = isFailedCall(tool.result);
+                        const output = formatToolOutput(tool.result);
+                        return (
+                          <li key={tool.id} className={failed ? 'is-error' : undefined}>
+                            <div className="turn-call-head">
+                              <code>{tool.serverName ? `${tool.serverName} / ` : ''}{tool.toolName}</code>
+                              <span className="turn-call-outcome">
+                                {failed ? 'DENIED / FAILED' : 'OK'}
+                              </span>
+                            </div>
+                            {output && <pre className="turn-call-result">{output}</pre>}
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
 
